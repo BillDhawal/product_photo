@@ -6,6 +6,13 @@ import ChatBubbleOutlineRounded from '@mui/icons-material/ChatBubbleOutlineRound
 import ImageRounded from '@mui/icons-material/ImageRounded';
 import LayersRounded from '@mui/icons-material/LayersRounded';
 import PhotoCameraRounded from '@mui/icons-material/PhotoCameraRounded';
+import CropSquareRounded from '@mui/icons-material/CropSquareRounded';
+import CropPortraitRounded from '@mui/icons-material/CropPortraitRounded';
+import Inventory2Rounded from '@mui/icons-material/Inventory2Rounded';
+import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
+import CropFreeRounded from '@mui/icons-material/CropFreeRounded';
+import CameraAltRounded from '@mui/icons-material/CameraAltRounded';
+import StorefrontRounded from '@mui/icons-material/StorefrontRounded';
 import './App.css';
 import propPodium from './assets/props/podioum_1.png';
 import propSnakePlant from './assets/props/snake_plant_1.png';
@@ -442,11 +449,23 @@ function CanvasImage({ frame, isSelected, onSelect, onChange, stageSize }) {
   );
 }
 
-function Preview({ frames, setFrames, propsPanel, backgroundPanel, onToggleProps }) {
+function Preview({
+  frames,
+  setFrames,
+  propsPanel,
+  backgroundPanel,
+  canvasPreset,
+  canvasPresets,
+  onPresetChange,
+  stageRef,
+  presetCategory,
+  onCategoryChange
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const containerRef = useRef(null);
+  const wrapRef = useRef(null);
 
   // Undo/redo helpers
   const pushHistory = (newFrames) => {
@@ -495,14 +514,18 @@ function Preview({ frames, setFrames, propsPanel, backgroundPanel, onToggleProps
   };
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!wrapRef.current) return;
     const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
+      const { width: maxWidth, height: maxHeight } = entry.contentRect;
+      if (!maxWidth || !maxHeight) return;
+      const ratio = canvasPreset.width / canvasPreset.height;
+      const width = Math.min(maxWidth, maxHeight * ratio);
+      const height = width / ratio;
       setStageSize({ width, height });
     });
-    observer.observe(containerRef.current);
+    observer.observe(wrapRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [canvasPreset]);
 
   const selectedFrame = frames.find(frame => frame.selected);
   const hasSelection = Boolean(selectedFrame);
@@ -554,42 +577,103 @@ function Preview({ frames, setFrames, propsPanel, backgroundPanel, onToggleProps
           <button className="icon-button" onClick={redo} disabled={!redoStack.length} title="Redo">
             <Icon name="redo" />
           </button>
-          <button className="icon-button primary" onClick={onToggleProps} title="Props">
-            <Icon name="props" />
-          </button>
+          <div className="dimension-picker">
+            <button
+              className="dimension-trigger"
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <span className="dimension-icon">{canvasPreset.icon}</span>
+              <span>{canvasPreset.width} x {canvasPreset.height}px</span>
+              <ExpandMoreRounded />
+            </button>
+            <div className={`dimension-menu ${menuOpen ? 'open' : ''}`}>
+              <div className="dimension-tabs">
+                <button
+                  className={presetCategory === 'standard' ? 'active' : ''}
+                  onClick={() => onCategoryChange('standard')}
+                >
+                  <CropFreeRounded />
+                  Standard
+                </button>
+                <button
+                  className={presetCategory === 'social' ? 'active' : ''}
+                  onClick={() => onCategoryChange('social')}
+                >
+                  <CameraAltRounded />
+                  SNS
+                </button>
+                <button
+                  className={presetCategory === 'marketplace' ? 'active' : ''}
+                  onClick={() => onCategoryChange('marketplace')}
+                >
+                  <StorefrontRounded />
+                  Marketplace
+                </button>
+              </div>
+              <div className="dimension-list">
+                {canvasPresets
+                  .filter((preset) => preset.category === presetCategory)
+                  .map((preset) => (
+                    <button
+                      key={preset.id}
+                      className={`dimension-row ${canvasPreset.id === preset.id ? 'active' : ''}`}
+                      onClick={() => {
+                        onPresetChange(preset);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <span className="dimension-row-label">
+                        {preset.icon}
+                        {preset.label}
+                      </span>
+                      <span className="dimension-row-size">
+                        {preset.width} x {preset.height}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="preview-canvas" ref={containerRef}>
-        <Stage
-          width={stageSize.width}
-          height={stageSize.height}
-          onMouseDown={(e) => {
-            if (e.target === e.target.getStage()) {
-              setFrames(frames.map(f => ({ ...f, selected: false })));
-            }
-          }}
+      <div className="preview-canvas-wrap" ref={wrapRef}>
+        <div
+          className="preview-canvas"
+          style={{ width: stageSize.width, height: stageSize.height }}
         >
-          <Layer>
-            {frames
-              .slice()
-              .sort((a, b) => a.zIndex - b.zIndex)
-              .map(frame => (
-                <CanvasImage
-                  key={frame.id}
-                  frame={frame}
-                  isSelected={frame.selected}
-                  onSelect={() => selectFrame(frame.id)}
-                  onChange={(attrs) => updateFrame(frame.id, attrs)}
-                  stageSize={stageSize}
-                />
-              ))}
-          </Layer>
-        </Stage>
-        {selectedFrame && stageSize.width > 0 && stageSize.height > 0 && (
-          <div className="frame-controls-floating" style={getControlsPosition()}>
-            {renderControls(selectedFrame)}
-          </div>
-        )}
+          <Stage
+            width={stageSize.width}
+            height={stageSize.height}
+            ref={stageRef}
+            onMouseDown={(e) => {
+              if (e.target === e.target.getStage()) {
+                setFrames(frames.map(f => ({ ...f, selected: false })));
+              }
+            }}
+          >
+            <Layer>
+              {frames
+                .slice()
+                .sort((a, b) => a.zIndex - b.zIndex)
+                .map(frame => (
+                  <CanvasImage
+                    key={frame.id}
+                    frame={frame}
+                    isSelected={frame.selected}
+                    onSelect={() => selectFrame(frame.id)}
+                    onChange={(attrs) => updateFrame(frame.id, attrs)}
+                    stageSize={stageSize}
+                  />
+                ))}
+            </Layer>
+          </Stage>
+          {selectedFrame && stageSize.width > 0 && stageSize.height > 0 && (
+            <div className="frame-controls-floating" style={getControlsPosition()}>
+              {renderControls(selectedFrame)}
+            </div>
+          )}
+        </div>
       </div>
       {backgroundPanel}
       {propsPanel}
@@ -644,6 +728,191 @@ function PropsPanel({ open, items, onAdd, onClose }) {
 function App() {
   const [frames, setFrames] = useState([]);
   const [activePanel, setActivePanel] = useState('chat');
+  const stageRef = useRef(null);
+
+  const canvasPresets = useMemo(() => ([
+    {
+      id: 'standard-1-1',
+      category: 'standard',
+      label: '1:1',
+      width: 1512,
+      height: 1512,
+      icon: <CropSquareRounded />
+    },
+    {
+      id: 'standard-4-3',
+      category: 'standard',
+      label: '4:3',
+      width: 2016,
+      height: 1512,
+      icon: <CropFreeRounded />
+    },
+    {
+      id: 'standard-16-9',
+      category: 'standard',
+      label: '16:9',
+      width: 2688,
+      height: 1512,
+      icon: <CropFreeRounded />
+    },
+    {
+      id: 'standard-4-5',
+      category: 'standard',
+      label: '4:5',
+      width: 1512,
+      height: 1890,
+      icon: <CropPortraitRounded />
+    },
+    {
+      id: 'standard-9-16',
+      category: 'standard',
+      label: '9:16',
+      width: 1512,
+      height: 2688,
+      icon: <CropPortraitRounded />
+    },
+    {
+      id: 'sns-ig-post',
+      category: 'social',
+      label: 'Instagram Post',
+      width: 1080,
+      height: 1080,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-ig-story',
+      category: 'social',
+      label: 'Instagram Story',
+      width: 1080,
+      height: 1920,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-ig-reels',
+      category: 'social',
+      label: 'Instagram Reels',
+      width: 1080,
+      height: 1920,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-ig-feed',
+      category: 'social',
+      label: 'Instagram Feed',
+      width: 1080,
+      height: 1350,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-yt-thumb',
+      category: 'social',
+      label: 'YouTube Thumbnail',
+      width: 1280,
+      height: 720,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-yt-profile',
+      category: 'social',
+      label: 'YouTube Profile',
+      width: 800,
+      height: 800,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-yt-channel',
+      category: 'social',
+      label: 'YouTube Channel Art',
+      width: 2560,
+      height: 1440,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-fb-newsfeed',
+      category: 'social',
+      label: 'Facebook Newsfeed',
+      width: 1200,
+      height: 1200,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-fb-story',
+      category: 'social',
+      label: 'Facebook Story/Post',
+      width: 1080,
+      height: 1920,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'sns-fb-profile',
+      category: 'social',
+      label: 'Facebook Profile',
+      width: 720,
+      height: 720,
+      icon: <CameraAltRounded />
+    },
+    {
+      id: 'market-amazon',
+      category: 'marketplace',
+      label: 'Amazon',
+      width: 2000,
+      height: 2000,
+      icon: <Inventory2Rounded />
+    },
+    {
+      id: 'market-ebay',
+      category: 'marketplace',
+      label: 'eBay',
+      width: 1600,
+      height: 1600,
+      icon: <Inventory2Rounded />
+    },
+    {
+      id: 'market-shopee',
+      category: 'marketplace',
+      label: 'Shopee',
+      width: 1080,
+      height: 1080,
+      icon: <Inventory2Rounded />
+    },
+    {
+      id: 'market-lazada',
+      category: 'marketplace',
+      label: 'Lazada',
+      width: 1080,
+      height: 1080,
+      icon: <Inventory2Rounded />
+    },
+    {
+      id: 'market-etsy',
+      category: 'marketplace',
+      label: 'Etsy',
+      width: 2700,
+      height: 2025,
+      icon: <Inventory2Rounded />
+    },
+    {
+      id: 'market-shopify',
+      category: 'marketplace',
+      label: 'Shopify',
+      width: 2048,
+      height: 2048,
+      icon: <Inventory2Rounded />
+    }
+  ]), []);
+  const [canvasPreset, setCanvasPreset] = useState(canvasPresets[0]);
+  const [presetCategory, setPresetCategory] = useState('standard');
+  const handleDownload = () => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const uri = stage.toDataURL({ pixelRatio: 2 });
+    const link = document.createElement('a');
+    link.download = `product-photo-${canvasPreset.id}.png`;
+    link.href = uri;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   const propsAssets = useMemo(() => (
     Array.from({ length: 10 }, (_, idx) => {
@@ -755,7 +1024,7 @@ function App() {
           <button className="icon-button" title="Add Prop" onClick={() => setActivePanel('props')}>
             <Icon name="plus" />
           </button>
-          <button className="icon-button primary" title="Download">
+          <button className="icon-button primary" title="Download" onClick={handleDownload}>
             <Icon name="download" />
           </button>
         </div>
@@ -794,6 +1063,12 @@ function App() {
         <Preview
           frames={frames}
           setFrames={setFrames}
+          canvasPreset={canvasPreset}
+          canvasPresets={canvasPresets}
+          onPresetChange={setCanvasPreset}
+          stageRef={stageRef}
+          presetCategory={presetCategory}
+          onCategoryChange={setPresetCategory}
           backgroundPanel={(
             <BackgroundPanel
               open={false}

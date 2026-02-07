@@ -711,6 +711,135 @@ body {
 .preview-actions {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+}
+
+.dimension-picker {
+  position: relative;
+  margin-left: 0.25rem;
+}
+
+.dimension-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid #2a3140;
+  background: #0b0f16;
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dimension-trigger svg {
+  font-size: 16px;
+}
+
+.dimension-icon svg {
+  font-size: 16px;
+}
+
+.dimension-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 360px;
+  background: #0f131b;
+  border: 1px solid #1f2430;
+  border-radius: 16px;
+  box-shadow: 0 25px 55px rgba(0,0,0,0.4);
+  padding: 0.75rem;
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.dimension-menu.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.dimension-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.dimension-tabs button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: #0b0f16;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.dimension-tabs button svg {
+  font-size: 15px;
+}
+
+.dimension-tabs button.active {
+  border-color: rgba(16,185,129,0.4);
+  color: #10b981;
+  background: rgba(16,185,129,0.12);
+}
+
+.dimension-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.dimension-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.dimension-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dimension-row-size {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.dimension-row.active {
+  background: #121827;
+  border-color: #2a3140;
+}
+
+.preview-canvas-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  max-height: calc(100vh - 220px);
 }
 
 .preview-canvas {
@@ -723,14 +852,6 @@ body {
   background-position: 0 0, 0 14px, 14px -14px, -14px 0px;
   border: 1px solid #1f2430;
   border-radius: 16px;
-  width: min(100%, 900px);
-  height: min(100%, 900px);
-  min-height: 420px;
-  min-width: 420px;
-  max-width: 100%;
-  max-height: calc(100vh - 220px);
-  margin-top: 1rem;
-  align-self: center;
   position: relative;
   overflow: hidden;
   box-shadow: 0 30px 60px rgba(0,0,0,0.35);
