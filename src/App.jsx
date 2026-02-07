@@ -1,14 +1,55 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { removeBackground } from '@imgly/background-removal';
-import { Rnd } from 'react-rnd';
+import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
+import { Button, Select, TextInput } from 'flowbite-react';
+import ChatBubbleOutlineRounded from '@mui/icons-material/ChatBubbleOutlineRounded';
+import ImageRounded from '@mui/icons-material/ImageRounded';
+import LayersRounded from '@mui/icons-material/LayersRounded';
+import PhotoCameraRounded from '@mui/icons-material/PhotoCameraRounded';
 import './App.css';
+import propPodium from './assets/props/podioum_1.png';
+import propSnakePlant from './assets/props/snake_plant_1.png';
+import bg01 from './assets/backgrounds/background-01.jpg';
+import bg02 from './assets/backgrounds/background-02.jpg';
+import bg03 from './assets/backgrounds/background-03.jpg';
+import bg04 from './assets/backgrounds/background-04.jpg';
+import bg05 from './assets/backgrounds/background-05.jpg';
+import bg06 from './assets/backgrounds/background-06.jpg';
+import bg07 from './assets/backgrounds/background-07.jpg';
+import bg08 from './assets/backgrounds/background-08.jpg';
+import bg09 from './assets/backgrounds/background-09.jpg';
+import bg10 from './assets/backgrounds/background-10.jpg';
 
-function Sidebar({ addPhotoFrame }) {
+const Icon = ({ name }) => {
+  const paths = {
+    wand: 'M5 15l10-10M12 4l1.5 2.5L16 8l-2.5 1.5L12 12l-1.5-2.5L8 8l2.5-1.5L12 4z',
+    plus: 'M12 5v14M5 12h14',
+    download: 'M12 3v12m0 0l4-4m-4 4l-4-4M5 19h14',
+    layersUp: 'M12 4l7 4-7 4-7-4 7-4zm0 8l7 4-7 4-7-4 7-4z',
+    layersDown: 'M12 4l7 4-7 4-7-4 7-4zm7 8l-7 4-7-4',
+    undo: 'M9 7H5v4M5 11c1.5-3 4.5-4 7.5-4 3.5 0 6.5 2 7.5 5',
+    redo: 'M15 7h4v4M19 11c-1.5-3-4.5-4-7.5-4-3.5 0-6.5 2-7.5 5',
+    duplicate: 'M8 8h9v9H8zM6 6h9v9',
+    trash: 'M5 7h14M9 7V5h6v2M8 7l1 10h6l1-10',
+    props: 'M4 7h7v10H4zM13 7h7v6h-7zM13 15h7v2h-7z',
+    spark: 'M12 3l1.5 3.5L17 8l-3.5 1.5L12 13l-1.5-3.5L7 8l3.5-1.5L12 3z',
+    grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+  };
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={paths[name]} />
+    </svg>
+  );
+};
+
+function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [alphaMatting, setAlphaMatting] = useState(true);
   const [foregroundThreshold, setForegroundThreshold] = useState(240);
   const [backgroundThreshold, setBackgroundThreshold] = useState(10);
+  const [showUploadGuide, setShowUploadGuide] = useState(false);
+  const [hideGuideNextTime, setHideGuideNextTime] = useState(false);
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -78,39 +119,135 @@ function Sidebar({ addPhotoFrame }) {
       setLoading(false);
     }
   };
-      return (
+  const handleUploadTrigger = () => {
+    if (!hideGuideNextTime) {
+      setShowUploadGuide(true);
+    } else {
+      document.getElementById('product-upload-input')?.click();
+    }
+  };
+
+  return (
     <aside className="sidebar">
-      <h2>Sidebar</h2>
-      <label className="upload-label">
-        <span>Add Product Photo</span>
-        <input type="file" accept="image/*" onChange={handlePhotoChange} style={{ display: 'none' }} />
-      </label>
-      <div style={{ margin: '1rem 0', color: '#e5e7eb', fontSize: '0.95rem' }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>
-          <input type="checkbox" checked={alphaMatting} onChange={e => setAlphaMatting(e.target.checked)} />
-          Alpha Matting
-        </label>
-        <label>Foreground Threshold: {foregroundThreshold}
-          <input type="range" min="0" max="255" value={foregroundThreshold} onChange={e => setForegroundThreshold(Number(e.target.value))} />
-        </label>
-        <br />
-        <label>Background Threshold: {backgroundThreshold}
-          <input type="range" min="0" max="255" value={backgroundThreshold} onChange={e => setBackgroundThreshold(Number(e.target.value))} />
-        </label>
+      <div className="icon-sidebar">
+        <button
+          className={`icon-tile ${activePanel === 'product' ? 'active' : ''}`}
+          onClick={handleUploadTrigger}
+          title="Add Product Photo"
+        >
+          <PhotoCameraRounded />
+        </button>
+        <button
+          className={`icon-tile ${activePanel === 'chat' ? 'active' : ''}`}
+          onClick={() => setActivePanel('chat')}
+          title="Chatbot"
+        >
+          <ChatBubbleOutlineRounded />
+        </button>
+        <button
+          className={`icon-tile ${activePanel === 'props' ? 'active' : ''}`}
+          onClick={() => setActivePanel('props')}
+          title="Props"
+        >
+          <LayersRounded />
+        </button>
+        <button
+          className={`icon-tile ${activePanel === 'background' ? 'active' : ''}`}
+          onClick={() => setActivePanel('background')}
+          title="Backgrounds"
+        >
+          <ImageRounded />
+        </button>
       </div>
+      <input
+        id="product-upload-input"
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoChange}
+        className="hidden-upload-input"
+      />
       {loading && (
         <div className="photo-preview">
           <div className="spinner" />
-          <span style={{ color: '#fff' }}>Removing background...</span>
+          <span>Removing background...</span>
         </div>
       )}
       {photo && !loading && (
         <div className="photo-preview">
-          <img src={photo} alt="Product preview" style={{ background: 'none' }} />
+          <img src={photo} alt="Product preview" />
         </div>
       )}
-      <button>Select Background</button>
-      <button>Select Props</button>
+      {showUploadGuide && (
+        <div className="upload-modal-backdrop" onClick={() => setShowUploadGuide(false)}>
+          <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="upload-guide-header">
+              <div>
+                <h3>Upload tips</h3>
+                <p>Use a clean, centered product shot.</p>
+              </div>
+              <button className="icon-button small" onClick={() => setShowUploadGuide(false)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="upload-guide-body">
+              <div className="guide-section good">
+                <div className="guide-title">Good example</div>
+                <div className="guide-text">Undistorted angle product photo.</div>
+              </div>
+              <div className="guide-section bad">
+                <div className="guide-title">Bad examples</div>
+                <ul>
+                  <li>Portrait photo</li>
+                  <li>Distorted angle</li>
+                  <li>Cut-off edges</li>
+                  <li>Group photo</li>
+                </ul>
+              </div>
+              <div className="control-block modal">
+                <div className="control-header">
+                  <div>
+                    <h3>Cutout settings</h3>
+                    <p>Adjust if edges look rough.</p>
+                  </div>
+                </div>
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={alphaMatting} onChange={e => setAlphaMatting(e.target.checked)} />
+                  <span>Alpha Matting</span>
+                </label>
+                <label className="range-row">
+                  <span>Foreground Threshold</span>
+                  <div className="range-meta">{foregroundThreshold}</div>
+                  <input type="range" min="0" max="255" value={foregroundThreshold} onChange={e => setForegroundThreshold(Number(e.target.value))} />
+                </label>
+                <label className="range-row">
+                  <span>Background Threshold</span>
+                  <div className="range-meta">{backgroundThreshold}</div>
+                  <input type="range" min="0" max="255" value={backgroundThreshold} onChange={e => setBackgroundThreshold(Number(e.target.value))} />
+                </label>
+              </div>
+              <label className="checkbox-row small">
+                <input
+                  type="checkbox"
+                  checked={hideGuideNextTime}
+                  onChange={(e) => setHideGuideNextTime(e.target.checked)}
+                />
+                <span>I do not want to see it from now on.</span>
+              </label>
+              <label className="upload-action">
+                <span className="primary-button">Upload product photo to begin</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    handlePhotoChange(e);
+                    setShowUploadGuide(false);
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
@@ -121,16 +258,11 @@ function AIChatbot() {
     { id: 'stable-diffusion', name: 'Stable Diffusion' },
     { id: 'controlnet', name: 'ControlNet' }
   ];
-  const starterPrompts = [
-    'Perfume backdrop',
-    'Add AI human',
-    'Select from template'
-  ];
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [chat, setChat] = useState([
-    { sender: 'bot', text: 'Hi! I am your AI assistant. What background can I create for your product photo?', suggestions: starterPrompts }
+    { sender: 'bot', text: 'Hi! I am your AI assistant. What background can I create for your product photo?' }
   ]);
   // Dummy image URLs
   const dummyImages = [
@@ -163,63 +295,70 @@ function AIChatbot() {
       setLoading(false);
     }, 1200);
   };
+  const showQuickPrompts = chat.length === 1 && chat[0].sender === 'bot';
   return (
     <section className="ai-chatbot">
-      <h2 style={{ color: '#e5e7eb', fontSize: '1.35rem', marginBottom: 8 }}>AI Chatbot</h2>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontWeight: 600, color: '#e5e7eb', fontSize: '1rem', marginRight: 8 }}>Select Model:</label>
-        <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} style={{ padding: '0.5rem', borderRadius: 6, border: '1px solid #6366f1', background: '#23232a', color: '#e5e7eb', fontWeight: 500 }}>
+      <div className="model-row compact">
+        <label>Model</label>
+        <Select
+          value={selectedModel}
+          onChange={e => setSelectedModel(e.target.value)}
+          className="flowbite-select compact"
+        >
           {models.map(m => (
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
-        </select>
+        </Select>
       </div>
-      <div className="chat-window" style={{ background: '#23232a', color: '#e5e7eb', minHeight: 320, minWidth: 380, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '1.5rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {chat.map((msg, idx) => (
-          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-            <div style={{
-              background: msg.sender === 'bot' ? '#18181b' : '#6366f1',
-              color: msg.sender === 'bot' ? '#e5e7eb' : '#fff',
-              borderRadius: 10,
-              padding: '0.75rem 1.25rem',
-              fontWeight: 500,
-              fontSize: '1rem',
-              maxWidth: 320,
-              marginBottom: msg.thumbnails ? 8 : 0,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-            }}>{msg.text}</div>
-            {msg.suggestions && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                {msg.suggestions.map(sp => (
-                  <button key={sp} onClick={() => handleSuggestion(sp)} style={{ background: '#23232a', color: '#e5e7eb', border: '1px solid #6366f1', borderRadius: 8, padding: '0.25rem 0.75rem', cursor: 'pointer', fontWeight: 500, fontSize: '0.95rem', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>{sp}</button>
-                ))}
-              </div>
-            )}
-            {msg.thumbnails && (
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                {msg.thumbnails.map((url, tidx) => (
-                  <img key={tidx} src={url} alt={`Thumbnail ${tidx + 1}`} style={{ width: 110, height: 110, borderRadius: 10, border: '2px solid #6366f1', background: '#18181b', objectFit: 'cover' }} />
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        {loading && (
-          <div style={{ textAlign: 'center', margin: '1rem 0' }}>
-            <div className="spinner" />
-            <span style={{ color: '#e5e7eb', fontWeight: 500 }}>Generating thumbnails...</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <input
+      <div className="chat-window">
+        <div className="chat-history">
+          {chat.map((msg, idx) => (
+            <div key={idx} className={`chat-message ${msg.sender === 'user' ? 'is-user' : 'is-bot'}`}>
+              <div className="chat-bubble">{msg.text}</div>
+              {idx === 0 && showQuickPrompts && (
+                <div className="chat-empty inline">
+                  <div className="chat-empty-badge">
+                    <Icon name="spark" />
+                    <span>Try a quick prompt</span>
+                  </div>
+                  <div className="chat-empty-grid">
+                    <button onClick={() => handleSuggestion('Soft morning light')} className="empty-chip">Soft morning light</button>
+                    <button onClick={() => handleSuggestion('Minimal shadow play')} className="empty-chip">Minimal shadow play</button>
+                    <button onClick={() => handleSuggestion('Spa marble backdrop')} className="empty-chip">Spa marble backdrop</button>
+                    <button onClick={() => handleSuggestion('Botanical studio set')} className="empty-chip">Botanical studio set</button>
+                  </div>
+                </div>
+              )}
+              {msg.thumbnails && (
+                <div className="thumbnail-grid">
+                  {msg.thumbnails.map((url, tidx) => (
+                    <button key={tidx} className="thumbnail-card">
+                      <img src={url} alt={`Thumbnail ${tidx + 1}`} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {loading && (
+            <div className="chat-loading">
+              <div className="spinner" />
+              <span>Generating thumbnails...</span>
+            </div>
+          )}
+        </div>
+        <div className="chat-input">
+          <TextInput
             type="text"
             placeholder="Type your prompt..."
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
-            style={{ flex: 1, padding: '0.75rem', borderRadius: 8, border: '1px solid #6366f1', background: '#18181b', color: '#e5e7eb', fontSize: '1rem', fontWeight: 500 }}
             onKeyDown={e => { if (e.key === 'Enter') sendMessage(prompt); }}
+            className="chat-text-input"
           />
-          <button onClick={() => sendMessage(prompt)} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 1.25rem', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}>Send</button>
+          <Button onClick={() => sendMessage(prompt)} className="primary-button">
+            Send
+          </Button>
         </div>
       </div>
     </section>
@@ -228,9 +367,86 @@ function AIChatbot() {
 
 
 
-function Preview({ frames, setFrames }) {
+function CanvasImage({ frame, isSelected, onSelect, onChange, stageSize }) {
+  const shapeRef = useRef(null);
+  const trRef = useRef(null);
+  const [image, setImage] = useState(null);
+  const isBackground = Boolean(frame.isBackground);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = frame.src;
+    img.onload = () => setImage(img);
+  }, [frame.src]);
+
+  useEffect(() => {
+    if (isSelected && trRef.current && shapeRef.current) {
+      trRef.current.nodes([shapeRef.current]);
+      trRef.current.getLayer().batchDraw();
+    }
+  }, [isSelected]);
+
+  return (
+    <>
+      <KonvaImage
+        image={image}
+        x={isBackground ? 0 : frame.x}
+        y={isBackground ? 0 : frame.y}
+        width={isBackground ? stageSize.width : frame.width}
+        height={isBackground ? stageSize.height : frame.height}
+        draggable={!isBackground}
+        ref={shapeRef}
+        onClick={isBackground ? undefined : onSelect}
+        onTap={isBackground ? undefined : onSelect}
+        onDragEnd={(e) => {
+          if (isBackground) return;
+          onChange({
+            ...frame,
+            x: e.target.x(),
+            y: e.target.y(),
+          });
+        }}
+        onTransformEnd={() => {
+          if (isBackground) return;
+          const node = shapeRef.current;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          onChange({
+            ...frame,
+            x: node.x(),
+            y: node.y(),
+            width: Math.max(40, node.width() * scaleX),
+            height: Math.max(40, node.height() * scaleY),
+          });
+        }}
+      />
+      {isSelected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled={false}
+          anchorSize={10}
+          borderStroke="#6366f1"
+          anchorStroke="#6366f1"
+          anchorFill="#0f1115"
+          boundBoxFunc={(oldBox, newBox) => {
+            if (newBox.width < 40 || newBox.height < 40) {
+              return oldBox;
+            }
+            return newBox;
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function Preview({ frames, setFrames, propsPanel, backgroundPanel, onToggleProps }) {
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const containerRef = useRef(null);
 
   // Undo/redo helpers
   const pushHistory = (newFrames) => {
@@ -253,15 +469,11 @@ function Preview({ frames, setFrames }) {
     }
   };
 
-  // Drag/resize logic
-  const dragFrame = (id, dx, dy) => {
-    pushHistory(frames.map(f => f.id === id ? { ...f, x: f.x + dx, y: f.y + dy } : f));
-  };
-  const resizeFrame = (id, dw, dh) => {
-    pushHistory(frames.map(f => f.id === id ? { ...f, width: Math.max(50, f.width + dw), height: Math.max(50, f.height + dh) } : f));
-  };
   const selectFrame = (id) => {
     setFrames(frames.map(f => ({ ...f, selected: f.id === id })));
+  };
+  const updateFrame = (id, attrs) => {
+    pushHistory(frames.map(f => f.id === id ? { ...f, ...attrs } : f));
   };
   const deleteFrame = (id) => {
     pushHistory(frames.filter(f => f.id !== id));
@@ -282,86 +494,198 @@ function Preview({ frames, setFrames }) {
     pushHistory(frames.map(f => f.id === id ? { ...f, zIndex: minZ - 1 } : f));
   };
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setStageSize({ width, height });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const selectedFrame = frames.find(frame => frame.selected);
+  const hasSelection = Boolean(selectedFrame);
+
   // Render frame controls
   const renderControls = (frame) => (
     <div className="frame-controls">
-      <button onClick={() => bringToFront(frame.id)}>Front</button>
-      <button onClick={() => sendToBack(frame.id)}>Back</button>
-      <button onClick={() => duplicateFrame(frame.id)}>Duplicate</button>
-      <button className="delete" onClick={() => deleteFrame(frame.id)}>Delete</button>
+      <button onClick={() => bringToFront(frame.id)} title="Bring to front" aria-label="Bring to front">
+        <Icon name="layersUp" />
+      </button>
+      <button onClick={() => sendToBack(frame.id)} title="Send to back" aria-label="Send to back">
+        <Icon name="layersDown" />
+      </button>
+      <button onClick={() => duplicateFrame(frame.id)} title="Duplicate" aria-label="Duplicate">
+        <Icon name="duplicate" />
+      </button>
+      <button className="delete" onClick={() => deleteFrame(frame.id)} title="Delete" aria-label="Delete">
+        <Icon name="trash" />
+      </button>
     </div>
   );
+
+  const getControlsPosition = () => {
+    if (!selectedFrame) return null;
+    const padding = 12;
+    const controlWidth = 240;
+    const controlHeight = 36;
+    const centerX = selectedFrame.x + selectedFrame.width / 2;
+    let left = Math.min(Math.max(centerX, controlWidth / 2 + padding), stageSize.width - controlWidth / 2 - padding);
+    let top = selectedFrame.y + selectedFrame.height + 12;
+    if (top + controlHeight + padding > stageSize.height) {
+      top = Math.max(selectedFrame.y - controlHeight - 12, padding);
+    }
+    return { left, top };
+  };
 
   // Render frames
   return (
     <section className="preview">
-      <div className="preview-toolbar">
-        <button onClick={undo} disabled={!history.length}>Undo</button>
-        <button onClick={redo} disabled={!redoStack.length}>Redo</button>
+      <div className="preview-header">
+        <div>
+          <h2>Canvas</h2>
+          <p>Arrange your product and props.</p>
+        </div>
+        <div className="preview-actions">
+          <button className="icon-button" onClick={undo} disabled={!history.length} title="Undo">
+            <Icon name="undo" />
+          </button>
+          <button className="icon-button" onClick={redo} disabled={!redoStack.length} title="Redo">
+            <Icon name="redo" />
+          </button>
+          <button className="icon-button primary" onClick={onToggleProps} title="Props">
+            <Icon name="props" />
+          </button>
+        </div>
       </div>
-      <div className="preview-canvas">
-        {frames.map(frame => (
-          <Rnd
-            key={frame.id}
-            size={{ width: frame.width, height: frame.height }}
-            position={{ x: frame.x, y: frame.y }}
-            style={{
-              zIndex: frame.zIndex,
-              border: frame.selected ? '2px solid #4f46e5' : '1px solid #ccc',
-                background: 'none',
-              boxSizing: 'border-box',
-              cursor: 'move',
-            }}
-            onDragStart={() => selectFrame(frame.id)}
-            onDragStop={(e, d) => {
-              pushHistory(frames.map(f => f.id === frame.id ? { ...f, x: d.x, y: d.y } : f));
-            }}
-            onResizeStart={() => selectFrame(frame.id)}
-            onResizeStop={(e, dir, ref, delta, pos) => {
-              pushHistory(frames.map(f => f.id === frame.id ? {
-                ...f,
-                width: ref.offsetWidth,
-                height: ref.offsetHeight,
-                x: pos.x,
-                y: pos.y,
-              } : f));
-            }}
-            minWidth={50}
-            minHeight={50}
-            bounds="parent"
-          >
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none' }}>
-              {frame.src ? (
-                <img src={frame.src} alt="Product" style={{ maxWidth: '100%', maxHeight: '100%', background: 'none' }} />
-              ) : (
-                <span style={{ color: '#888' }}>Product Image</span>
-              )}
-            </div>
-            {/* Controls */}
-            {frame.selected && renderControls(frame)}
-          </Rnd>
+      <div className="preview-canvas" ref={containerRef}>
+        <Stage
+          width={stageSize.width}
+          height={stageSize.height}
+          onMouseDown={(e) => {
+            if (e.target === e.target.getStage()) {
+              setFrames(frames.map(f => ({ ...f, selected: false })));
+            }
+          }}
+        >
+          <Layer>
+            {frames
+              .slice()
+              .sort((a, b) => a.zIndex - b.zIndex)
+              .map(frame => (
+                <CanvasImage
+                  key={frame.id}
+                  frame={frame}
+                  isSelected={frame.selected}
+                  onSelect={() => selectFrame(frame.id)}
+                  onChange={(attrs) => updateFrame(frame.id, attrs)}
+                  stageSize={stageSize}
+                />
+              ))}
+          </Layer>
+        </Stage>
+        {selectedFrame && stageSize.width > 0 && stageSize.height > 0 && (
+          <div className="frame-controls-floating" style={getControlsPosition()}>
+            {renderControls(selectedFrame)}
+          </div>
+        )}
+      </div>
+      {backgroundPanel}
+      {propsPanel}
+    </section>
+  );
+}
+
+function BackgroundPanel({ open, items, onAdd, onClose }) {
+  return (
+    <aside className={`background-panel ${open ? 'open' : ''}`}>
+      <div className="props-panel-header">
+        <div>
+          <h3>Backgrounds</h3>
+          <p>Choose a backdrop for your scene.</p>
+        </div>
+        <button className="ghost-button" onClick={onClose}>Close</button>
+      </div>
+      <div className="props-grid">
+        {items.map(item => (
+          <button key={item.id} className="props-card" onClick={() => onAdd(item.src)}>
+            <img src={item.src} alt={item.name} />
+            <span>{item.name}</span>
+          </button>
         ))}
       </div>
-    </section>
+    </aside>
+  );
+}
+
+function PropsPanel({ open, items, onAdd, onClose }) {
+  return (
+    <aside className={`props-panel ${open ? 'open' : ''}`}>
+      <div className="props-panel-header">
+        <div>
+          <h3>Props Library</h3>
+          <p>Drag inspiration assets into the canvas.</p>
+        </div>
+        <button className="ghost-button" onClick={onClose}>Close</button>
+      </div>
+      <div className="props-grid">
+        {items.map(item => (
+          <button key={item.id} className="props-card" onClick={() => onAdd(item.src)}>
+            <img src={item.src} alt={item.name} />
+            <span>{item.name}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
   );
 }
 
 function App() {
   const [frames, setFrames] = useState([]);
+  const [activePanel, setActivePanel] = useState('chat');
+
+  const propsAssets = useMemo(() => (
+    Array.from({ length: 10 }, (_, idx) => {
+      const isPodium = idx % 2 === 0;
+      return {
+        id: isPodium ? `podium-${idx}` : `snake-plant-${idx}`,
+        name: isPodium ? 'Podium' : 'Snake Plant',
+        src: isPodium ? propPodium : propSnakePlant,
+      };
+    })
+  ), []);
+
+  const backgroundAssets = useMemo(() => ([
+    { id: 'bg-01', name: 'Warm Pink', src: bg01 },
+    { id: 'bg-02', name: 'Soft Orange', src: bg02 },
+    { id: 'bg-03', name: 'Gold Ink', src: bg03 },
+    { id: 'bg-04', name: 'Marble Gold', src: bg04 },
+    { id: 'bg-05', name: 'Petal Flatlay', src: bg05 },
+    { id: 'bg-06', name: 'Blue Vase', src: bg06 },
+    { id: 'bg-07', name: 'Painted Wood', src: bg07 },
+    { id: 'bg-08', name: 'Floral Edge', src: bg08 },
+    { id: 'bg-09', name: 'Dry Twigs', src: bg09 },
+    { id: 'bg-10', name: 'Studio Room', src: bg10 },
+  ]), []);
 
   // Add photo to frames
   const addPhotoFrame = (src) => {
     const img = new window.Image();
     img.src = src;
     img.onload = () => {
+      const maxInitialSize = 360;
+      const scale = Math.min(1, maxInitialSize / Math.max(img.naturalWidth, img.naturalHeight));
+      const scaledWidth = Math.round(img.naturalWidth * scale);
+      const scaledHeight = Math.round(img.naturalHeight * scale);
       setFrames((prev) => [
         ...prev,
         {
           id: Date.now(),
           x: 120,
           y: 120,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
+          width: scaledWidth,
+          height: scaledHeight,
           zIndex: prev.length + 1,
           selected: false,
           src,
@@ -370,11 +694,124 @@ function App() {
     };
   };
 
+  const addPropFrame = (src) => {
+    const img = new window.Image();
+    img.src = src;
+    img.onload = () => {
+      const maxInitialSize = 240;
+      const scale = Math.min(1, maxInitialSize / Math.max(img.naturalWidth, img.naturalHeight));
+      const scaledWidth = Math.round(img.naturalWidth * scale);
+      const scaledHeight = Math.round(img.naturalHeight * scale);
+      setFrames((prev) => [
+        ...prev,
+        {
+          id: Date.now() + Math.random(),
+          x: 180,
+          y: 160,
+          width: scaledWidth,
+          height: scaledHeight,
+          zIndex: prev.length + 1,
+          selected: false,
+          src,
+        },
+      ]);
+    };
+  };
+
+  const addBackgroundFrame = (src) => {
+    setFrames((prev) => {
+      const minZ = prev.length ? Math.min(...prev.map(f => f.zIndex)) : 0;
+      const backgroundFrame = {
+        id: `bg-${Date.now()}`,
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        zIndex: minZ - 1,
+        selected: false,
+        src,
+        isBackground: true,
+      };
+      return [...prev.filter(f => !f.isBackground), backgroundFrame];
+    });
+  };
+
   return (
-    <div className="app-grid">
-      <Sidebar addPhotoFrame={addPhotoFrame} />
-      <AIChatbot />
-      <Preview frames={frames} setFrames={setFrames} />
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-icon">
+            <Icon name="wand" />
+          </div>
+          <div>
+            <h1>Product Photo Studio</h1>
+            <span>AI-assisted scenes & props</span>
+          </div>
+        </div>
+        <div className="topbar-actions">
+          <button className="icon-button" title="New Canvas">
+            <Icon name="grid" />
+          </button>
+          <button className="icon-button" title="Add Prop" onClick={() => setActivePanel('props')}>
+            <Icon name="plus" />
+          </button>
+          <button className="icon-button primary" title="Download">
+            <Icon name="download" />
+          </button>
+        </div>
+      </header>
+      <div className="app-grid">
+        <Sidebar
+          activePanel={activePanel}
+          setActivePanel={setActivePanel}
+          addPhotoFrame={addPhotoFrame}
+        />
+        <div className="panel-stack">
+          {activePanel === 'chat' && <AIChatbot />}
+          {activePanel === 'props' && (
+            <PropsPanel
+              open
+              items={propsAssets}
+              onAdd={addPropFrame}
+              onClose={() => setActivePanel('chat')}
+            />
+          )}
+          {activePanel === 'background' && (
+            <BackgroundPanel
+              open
+              items={backgroundAssets}
+              onAdd={addBackgroundFrame}
+              onClose={() => setActivePanel('chat')}
+            />
+          )}
+          {activePanel === 'product' && (
+            <div className="empty-panel">
+              <h3>Product</h3>
+              <p>Upload and manage product images.</p>
+            </div>
+          )}
+        </div>
+        <Preview
+          frames={frames}
+          setFrames={setFrames}
+          backgroundPanel={(
+            <BackgroundPanel
+              open={false}
+              items={backgroundAssets}
+              onAdd={addBackgroundFrame}
+              onClose={() => setActivePanel('chat')}
+            />
+          )}
+          propsPanel={(
+            <PropsPanel
+              open={false}
+              items={propsAssets}
+              onAdd={addPropFrame}
+              onClose={() => setActivePanel('chat')}
+            />
+          )}
+        />
+      </div>
     </div>
   );
 }

@@ -13,9 +13,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@imgly/background-removal": "^1.7.0",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.7",
+    "flowbite": "^4.0.1",
+    "flowbite-react": "^0.12.16",
+    "konva": "^10.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-konva": "^19.2.2",
     "react-rnd": "^10.5.2"
   },
   "devDependencies": {
