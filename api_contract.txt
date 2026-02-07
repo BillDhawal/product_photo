@@ -1,0 +1,89 @@
+API Contract: AI Chatbot Image Generation
+1. POST /api/generate
+Purpose:
+Generate product image variations using a selected model and prompt.
+
+Request:
+
+Content-Type: multipart/form-data
+Body:
+image (file, required): The uploaded product image (PNG/JPG).
+prompt (string, required): The user or starter prompt (e.g., "Perfume backdrop").
+model (string, required): The model to use (e.g., "stable-diffusion", "controlnet").
+num_images (integer, optional, default: 4): Number of variations to generate.
+Example Request:
+POST /api/generate
+Content-Type: multipart/form-data
+
+image: <file>
+prompt: "Add AI human"
+model: "stable-diffusion"
+num_images: 4
+
+
+Response:
+{
+  "images": [
+    "https://yourdomain.com/generated/abc1.png",
+    "https://yourdomain.com/generated/abc2.png",
+    "https://yourdomain.com/generated/abc3.png",
+    "https://yourdomain.com/generated/abc4.png"
+  ],
+  "model_used": "stable-diffusion",
+  "prompt_used": "Add AI human"
+}
+
+
+Status: 200 OK
+Content-Type: application/json
+Body:
+Error Response:
+{
+  "error": "Description of the error"
+}
+
+Status: 400/500
+Body:
+2. GET /api/models
+Purpose:
+List available models for dynamic selection.
+
+Response:
+
+Status: 200 OK
+Content-Type: application/json
+Body:
+{
+  "models": [
+    { "id": "stable-diffusion", "name": "Stable Diffusion" },
+    { "id": "controlnet", "name": "ControlNet" }
+  ]
+}
+3. (Optional) POST /api/variation
+Purpose:
+Generate new variations based on a previously generated image and a new prompt.
+
+Request:
+
+Content-Type: application/json
+Body:
+{
+  "image_url": "https://yourdomain.com/generated/abc1.png",
+  "prompt": "Change background to forest",
+  "model": "stable-diffusion",
+  "num_images": 4
+}
+Response:
+Same as /api/generate.
+
+Summary Table
+Endpoint	Method	Purpose
+/api/generate	POST	Generate image variations
+/api/models	GET	List available models
+/api/variation	POST	Generate new variations from selection
+This contract allows your frontend to:
+
+Fetch available models for the dropdown.
+Send product images and prompts to generate thumbnails.
+Request further variations as the user iterates.
+Let me know if you want this in OpenAPI/Swagger format or need a sample mock implementation!

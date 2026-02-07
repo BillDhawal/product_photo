@@ -1,0 +1,104 @@
+
+Here’s a step-by-step implementation guide and README for your AI Chatbot MVP, tailored for a product photography tool with dynamic model selection and prompt-driven image generation.
+
+AI Chatbot MVP: Product Photography Tool
+1. Project Overview
+Purpose: Enhance product photography by letting users upload images, remove backgrounds, and generate creative variations (backdrops, AI humans, templates) using open-source AI models.
+Features: Dynamic model selection, prompt-driven generation, thumbnail preview, interactive canvas, and iterative prompting.
+2. Core Workflow
+a. User Uploads Product Image
+Sidebar: Upload high-resolution product image.
+Background removal: Process image client-side or via API.
+b. AI Chatbot Prompts
+Display starter prompts:
+“Perfume backdrop”
+“Add AI human”
+“Select from template”
+Allow custom user prompts.
+c. Model Selection
+Let user choose from available open-source models (e.g., Stable Diffusion, ControlNet, etc.).
+Store model list in config or fetch from API.
+d. Image Generation
+Send uploaded image + prompt to selected model API.
+Generate 4 thumbnail variations.
+Show thumbnails in chatbot UI.
+e. Thumbnail Selection
+User selects a thumbnail.
+Preview selected image in canvas (drag/resize/delete).
+f. Iterative Prompting
+User can send new prompts for further variations.
+Chatbot sends current image and context to model API for updates.
+3. Step-by-Step Implementation Guide
+Step 1: UI Setup
+Sidebar: Upload, background removal, parameter controls.
+Chatbot: Starter prompts, prompt input, model selector, thumbnail grid.
+Canvas: Preview, drag/resize/delete.
+Step 2: Model API Integration
+Define API endpoints for each model (REST or WebSocket).
+Support dynamic model selection (dropdown or buttons).
+Send image + prompt to API, receive generated images.
+Step 3: Chatbot Logic
+Display starter prompts as clickable buttons.
+Allow custom prompt input.
+On prompt/model selection, call API and show loading spinner.
+Display 4 thumbnails as selectable images.
+Step 4: Canvas Integration
+On thumbnail selection, update canvas with new image.
+Allow further editing (drag/resize/delete).
+Step 5: Iterative Generation
+Store current image/context.
+On new prompt, send current image and context to API for new variations.
+Step 6: Documentation & README
+README: AI Chatbot MVP for Product Photography
+Features
+Upload product images and remove backgrounds.
+Dynamic selection of open-source AI models for image generation.
+Starter prompts and custom prompt input.
+Generate and preview 4 creative thumbnails per prompt.
+Interactive canvas for editing selected images.
+Iterative prompting for continuous creative exploration.
+Technologies
+React (UI)
+Vite (build)
+Tailwind CSS (styling)
+Open-source model APIs (e.g., Stable Diffusion, ControlNet)
+REST/WebSocket for backend communication
+Setup
+Clone repo and install dependencies.
+Configure available model APIs in a config file.
+Start frontend and backend servers.
+Usage
+Upload product image in Sidebar.
+Remove background (client or API).
+Use Chatbot to select prompt/model and generate thumbnails.
+Preview and edit selected image in canvas.
+Send further prompts for new variations.
+Extending
+Add more models by updating config/API.
+Add more starter prompts.
+Integrate additional editing tools in canvas.
+Example Implementation Steps
+Model API Config
+
+Chatbot UI
+
+Dropdown for model selection.
+Buttons for starter prompts.
+Input for custom prompt.
+Thumbnail grid for generated images.
+API Call
+
+Thumbnail Selection
+
+On click, update canvas with selected image.
+Iterative Prompting
+
+Store current image/context.
+On new prompt, send to API for new variations.
+Final Notes
+Keep the MVP simple: focus on prompt-driven generation, dynamic model selection, and thumbnail preview.
+Use open-source APIs for flexibility and cost control.
+Document endpoints and UI flow for easy onboarding.
+Let me know if you want code samples, UI wireframes, or backend API templates for any step!
+
+GPT-4.1 • 0x

@@ -116,12 +116,111 @@ function Sidebar({ addPhotoFrame }) {
 }
 
 function AIChatbot() {
+  // Chatbot state
+  const models = [
+    { id: 'stable-diffusion', name: 'Stable Diffusion' },
+    { id: 'controlnet', name: 'ControlNet' }
+  ];
+  const starterPrompts = [
+    'Perfume backdrop',
+    'Add AI human',
+    'Select from template'
+  ];
+  const [selectedModel, setSelectedModel] = useState(models[0].id);
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [chat, setChat] = useState([
+    { sender: 'bot', text: 'Hi! I am your AI assistant. What background can I create for your product photo?', suggestions: starterPrompts }
+  ]);
+  // Dummy image URLs
+  const dummyImages = [
+    'https://placehold.co/110x110?text=1',
+    'https://placehold.co/110x110?text=2',
+    'https://placehold.co/110x110?text=3',
+    'https://placehold.co/110x110?text=4'
+  ];
+  // Handle prompt suggestion click
+  const handleSuggestion = (p) => {
+    setPrompt('');
+    sendMessage(p);
+  };
+  // Send message (user prompt or input)
+  const sendMessage = (p) => {
+    if (!p) return;
+    setChat(prev => [...prev, { sender: 'user', text: p }]);
+    setLoading(true);
+    setPrompt('');
+    // Simulate API call
+    setTimeout(() => {
+      setChat(prev => [
+        ...prev,
+        {
+          sender: 'bot',
+          text: `Here are some generated backgrounds for: "${p}"`,
+          thumbnails: dummyImages
+        }
+      ]);
+      setLoading(false);
+    }, 1200);
+  };
   return (
     <section className="ai-chatbot">
-      <h2>AI Chatbot</h2>
-      <div className="chat-window">
-        {/* Chatbot UI goes here */}
-        <p>Ask me anything about product photography!</p>
+      <h2 style={{ color: '#e5e7eb', fontSize: '1.35rem', marginBottom: 8 }}>AI Chatbot</h2>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontWeight: 600, color: '#e5e7eb', fontSize: '1rem', marginRight: 8 }}>Select Model:</label>
+        <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)} style={{ padding: '0.5rem', borderRadius: 6, border: '1px solid #6366f1', background: '#23232a', color: '#e5e7eb', fontWeight: 500 }}>
+          {models.map(m => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="chat-window" style={{ background: '#23232a', color: '#e5e7eb', minHeight: 320, minWidth: 380, borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.12)', padding: '1.5rem', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {chat.map((msg, idx) => (
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+            <div style={{
+              background: msg.sender === 'bot' ? '#18181b' : '#6366f1',
+              color: msg.sender === 'bot' ? '#e5e7eb' : '#fff',
+              borderRadius: 10,
+              padding: '0.75rem 1.25rem',
+              fontWeight: 500,
+              fontSize: '1rem',
+              maxWidth: 320,
+              marginBottom: msg.thumbnails ? 8 : 0,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
+            }}>{msg.text}</div>
+            {msg.suggestions && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                {msg.suggestions.map(sp => (
+                  <button key={sp} onClick={() => handleSuggestion(sp)} style={{ background: '#23232a', color: '#e5e7eb', border: '1px solid #6366f1', borderRadius: 8, padding: '0.25rem 0.75rem', cursor: 'pointer', fontWeight: 500, fontSize: '0.95rem', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>{sp}</button>
+                ))}
+              </div>
+            )}
+            {msg.thumbnails && (
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                {msg.thumbnails.map((url, tidx) => (
+                  <img key={tidx} src={url} alt={`Thumbnail ${tidx + 1}`} style={{ width: 110, height: 110, borderRadius: 10, border: '2px solid #6366f1', background: '#18181b', objectFit: 'cover' }} />
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        {loading && (
+          <div style={{ textAlign: 'center', margin: '1rem 0' }}>
+            <div className="spinner" />
+            <span style={{ color: '#e5e7eb', fontWeight: 500 }}>Generating thumbnails...</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <input
+            type="text"
+            placeholder="Type your prompt..."
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            style={{ flex: 1, padding: '0.75rem', borderRadius: 8, border: '1px solid #6366f1', background: '#18181b', color: '#e5e7eb', fontSize: '1rem', fontWeight: 500 }}
+            onKeyDown={e => { if (e.key === 'Enter') sendMessage(prompt); }}
+          />
+          <button onClick={() => sendMessage(prompt)} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '0.75rem 1.25rem', cursor: 'pointer', fontWeight: 600, fontSize: '1rem' }}>Send</button>
+        </div>
       </div>
     </section>
   );

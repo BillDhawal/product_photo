@@ -5,7 +5,10 @@ A modern web application for product photography editing, built with React and V
 
 ---
 
-## 🚀 Project Setup
+
+## 🚀 Project Setup & Current Status
+
+**Current Step:** UI Creation with Dummy Data (API integration coming next)
 
 1. **Install dependencies:**
 	```sh
@@ -19,6 +22,20 @@ A modern web application for product photography editing, built with React and V
 	```sh
 	npm run build
 	```
+
+---
+
+## 📝 Development Workflow
+
+1. **UI Creation with Dummy Data**
+	- Build all UI components and flows using mock data and functions.
+	- Simulate API calls and responses for fast prototyping.
+2. **API Contract Definition** (next step)
+	- Define the structure and endpoints for backend integration.
+	- Ensure frontend and backend communicate seamlessly.
+3. **Backend/API Integration**
+	- Replace mock data with real API calls.
+	- Test and refine end-to-end flows.
 
 ---
 
