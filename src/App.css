@@ -1,6 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
+
 body {
   margin: 0;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Manrope", "Inter", system-ui, sans-serif;
+  font-size: 14px;
   background: #0f1115;
   color: #e5e7eb;
 }
@@ -856,6 +859,31 @@ body {
   overflow: hidden;
   box-shadow: 0 30px 60px rgba(0,0,0,0.35);
   touch-action: none;
+}
+
+.feedback-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid #2a3140;
+  background: #0f131b;
+  color: #e5e7eb;
+  font-size: 20px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(0,0,0,0.35);
+  transition: border 0.2s ease, transform 0.2s ease;
+  z-index: 60;
+}
+
+.feedback-fab:hover {
+  border-color: #6366f1;
+  transform: translateY(-2px);
 }
 
 .preview-canvas canvas {

@@ -16,6 +16,8 @@ import StorefrontRounded from '@mui/icons-material/StorefrontRounded';
 import './App.css';
 import propPodium from './assets/props/podioum_1.png';
 import propSnakePlant from './assets/props/snake_plant_1.png';
+import propCherryBlossomBranch from './assets/props/cherry_blossom_branch.png';
+import propCreepingPlantBranch from './assets/props/creeping_plant_branch.png';
 import bg01 from './assets/backgrounds/background-01.jpg';
 import bg02 from './assets/backgrounds/background-02.jpg';
 import bg03 from './assets/backgrounds/background-03.jpg';
@@ -47,6 +49,91 @@ const Icon = ({ name }) => {
       <path d={paths[name]} />
     </svg>
   );
+};
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const PUBLIC_FILE_BASE = import.meta.env.VITE_PUBLIC_FILE_BASE || API_BASE_URL;
+const DEFAULT_PROMPT_PREFIX =
+  'Preserve the exact composition and all props from the reference image. ' +
+  'Do NOT remove or replace any props, bottle, or shadows. ' +
+  'Only refine lighting, background texture, and overall realism.';
+
+const dataUrlToBlob = (dataUrl) => {
+  const [header, base64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+  const binary = atob(base64);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+  return new Blob([array], { type: mime });
+};
+
+const joinUrl = (base, path) => {
+  const normalizedBase = base.replace(/\/$/, '');
+  const normalizedPath = path.replace(/^\//, '');
+  return `${normalizedBase}/${normalizedPath}`;
+};
+
+const toProxyUrl = (url) => `${API_BASE_URL}/proxy?url=${encodeURIComponent(url)}`;
+
+const getCanvasSafeUrl = (url) => {
+  if (!url) return url;
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.startsWith(API_BASE_URL)) return url;
+  if (url.startsWith('http')) return toProxyUrl(url);
+  return url;
+};
+
+const toAspectRatio = (width, height) => {
+  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+  const divisor = gcd(width, height);
+  return `${width / divisor}:${height / divisor}`;
+};
+
+const uploadReferenceImage = async (dataUrl) => {
+  const formData = new FormData();
+  formData.append('file', dataUrlToBlob(dataUrl), 'reference.jpg');
+  const response = await fetch(`${API_BASE_URL}/upload`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) {
+    throw new Error('Failed to upload reference image.');
+  }
+  const payload = await response.json();
+  const url = payload?.url || payload?.data?.url || payload?.link;
+  if (!url) {
+    throw new Error('Upload response missing URL.');
+  }
+  return url.startsWith('http') ? url : joinUrl(PUBLIC_FILE_BASE, url);
+};
+
+const createGenerationTask = async ({ prompt, inputUrl, aspectRatio = '4:3', resolution = '1K' }) => {
+  const response = await fetch(`${API_BASE_URL}/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      input_url: inputUrl,
+      prompt,
+      aspect_ratio: aspectRatio,
+      resolution
+    })
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to create generation task.');
+  }
+  return response.json();
+};
+
+const pollGenerationTask = async (taskId) => {
+  const response = await fetch(`${API_BASE_URL}/status?task_id=${encodeURIComponent(taskId)}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to query generation task.');
+  }
+  return response.json();
 };
 
 function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
@@ -259,48 +346,85 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   );
 }
 
-function AIChatbot() {
+function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
   // Chatbot state
-  const models = [
-    { id: 'stable-diffusion', name: 'Stable Diffusion' },
-    { id: 'controlnet', name: 'ControlNet' }
-  ];
+  const models = [{ id: 'kie', name: 'KIE Flux' }];
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [chat, setChat] = useState([
     { sender: 'bot', text: 'Hi! I am your AI assistant. What background can I create for your product photo?' }
   ]);
-  // Dummy image URLs
-  const dummyImages = [
-    'https://placehold.co/110x110?text=1',
-    'https://placehold.co/110x110?text=2',
-    'https://placehold.co/110x110?text=3',
-    'https://placehold.co/110x110?text=4'
-  ];
   // Handle prompt suggestion click
   const handleSuggestion = (p) => {
     setPrompt('');
     sendMessage(p);
   };
   // Send message (user prompt or input)
-  const sendMessage = (p) => {
+  const sendMessage = async (p) => {
     if (!p) return;
     setChat(prev => [...prev, { sender: 'user', text: p }]);
     setLoading(true);
     setPrompt('');
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // TODO: Consider langchain/langgraph for prompt orchestration.
+      const finalPrompt = `${DEFAULT_PROMPT_PREFIX} ${p}`;
+      const referenceImage = getCanvasSnapshot ? getCanvasSnapshot() : null;
+      if (!referenceImage) {
+        throw new Error('Capture a canvas image before generating.');
+      }
+      const inputUrl = await uploadReferenceImage(referenceImage);
+      const task = await createGenerationTask({ prompt: finalPrompt, inputUrl, aspectRatio });
+      const taskId = task?.data?.taskId;
+      if (!taskId) {
+        throw new Error('KIE task ID missing.');
+      }
+      let status;
+      for (let i = 0; i < 20; i += 1) {
+        status = await pollGenerationTask(taskId);
+        const state = status?.data?.state;
+        if (state === 'success' || state === 'fail') break;
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      }
+      if (status?.data?.state !== 'success') {
+        throw new Error(status?.data?.failMsg || 'Generation failed.');
+      }
+      let resultUrls = [];
+      try {
+        const resultJson = status?.data?.resultJson || '{}';
+        const parsed = JSON.parse(resultJson);
+        resultUrls = parsed.resultUrls || [];
+      } catch (err) {
+        resultUrls = [];
+      }
+      let finalUrls = resultUrls.slice(0, 2);
+      if (finalUrls.length === 1) {
+        finalUrls = [finalUrls[0], finalUrls[0]];
+      }
+      const thumbnails = finalUrls.map((url, idx) => ({ id: `${idx}`, url }));
       setChat(prev => [
         ...prev,
         {
           sender: 'bot',
           text: `Here are some generated backgrounds for: "${p}"`,
-          thumbnails: dummyImages
+          thumbnails: thumbnails.map(t => t.url)
         }
       ]);
+    } catch (err) {
+      const message = err?.message || 'Generation failed. Please try again.';
+      const hint = message.toLowerCase().includes('invalid image format')
+        ? 'Tip: ensure your upload URL is public (set VITE_PUBLIC_FILE_BASE to your tunnel URL).'
+        : '';
+      setChat(prev => [
+        ...prev,
+        {
+          sender: 'bot',
+          text: hint ? `${message} ${hint}` : message
+        }
+      ]);
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
   const showQuickPrompts = chat.length === 1 && chat[0].sender === 'bot';
   return (
@@ -339,7 +463,11 @@ function AIChatbot() {
               {msg.thumbnails && (
                 <div className="thumbnail-grid">
                   {msg.thumbnails.map((url, tidx) => (
-                    <button key={tidx} className="thumbnail-card">
+                    <button
+                      key={tidx}
+                      className="thumbnail-card"
+                      onClick={() => onSelectGenerated?.(url)}
+                    >
                       <img src={url} alt={`Thumbnail ${tidx + 1}`} />
                     </button>
                   ))}
@@ -459,7 +587,9 @@ function Preview({
   onPresetChange,
   stageRef,
   presetCategory,
-  onCategoryChange
+  onCategoryChange,
+  frameReplaceRequest,
+  onFrameReplaceApplied
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [history, setHistory] = useState([]);
@@ -497,20 +627,39 @@ function Preview({
   const deleteFrame = (id) => {
     pushHistory(frames.filter(f => f.id !== id));
   };
+  const getBackgroundZ = () => {
+    const bg = frames.find(f => f.isBackground);
+    return bg ? bg.zIndex : null;
+  };
+  const getNonBackgroundFrames = () => frames.filter(f => !f.isBackground);
+
   const duplicateFrame = (id) => {
     const frame = frames.find(f => f.id === id);
     if (frame) {
-      const newFrame = { ...frame, id: Date.now(), x: frame.x + 30, y: frame.y + 30, selected: false };
+      const nonBg = getNonBackgroundFrames();
+      const maxNonBg = nonBg.length ? Math.max(...nonBg.map(f => f.zIndex)) : 0;
+      const newFrame = {
+        ...frame,
+        id: Date.now(),
+        x: frame.x + 30,
+        y: frame.y + 30,
+        selected: false,
+        zIndex: maxNonBg + 1
+      };
       pushHistory([...frames, newFrame]);
     }
   };
   const bringToFront = (id) => {
-    const maxZ = Math.max(...frames.map(f => f.zIndex));
-    pushHistory(frames.map(f => f.id === id ? { ...f, zIndex: maxZ + 1 } : f));
+    const nonBg = getNonBackgroundFrames();
+    const maxNonBg = nonBg.length ? Math.max(...nonBg.map(f => f.zIndex)) : 0;
+    pushHistory(frames.map(f => f.id === id ? { ...f, zIndex: maxNonBg + 1 } : f));
   };
   const sendToBack = (id) => {
-    const minZ = Math.min(...frames.map(f => f.zIndex));
-    pushHistory(frames.map(f => f.id === id ? { ...f, zIndex: minZ - 1 } : f));
+    const bgZ = getBackgroundZ();
+    const nonBg = getNonBackgroundFrames();
+    const minNonBg = nonBg.length ? Math.min(...nonBg.map(f => f.zIndex)) : 0;
+    const nextZ = bgZ === null ? minNonBg - 1 : Math.max(bgZ + 1, minNonBg - 1);
+    pushHistory(frames.map(f => f.id === id ? { ...f, zIndex: nextZ } : f));
   };
 
   useEffect(() => {
@@ -526,6 +675,12 @@ function Preview({
     observer.observe(wrapRef.current);
     return () => observer.disconnect();
   }, [canvasPreset]);
+
+  useEffect(() => {
+    if (!frameReplaceRequest) return;
+    pushHistory(frameReplaceRequest);
+    onFrameReplaceApplied?.();
+  }, [frameReplaceRequest, onFrameReplaceApplied]);
 
   const selectedFrame = frames.find(frame => frame.selected);
   const hasSelection = Boolean(selectedFrame);
@@ -568,7 +723,6 @@ function Preview({
       <div className="preview-header">
         <div>
           <h2>Canvas</h2>
-          <p>Arrange your product and props.</p>
         </div>
         <div className="preview-actions">
           <button className="icon-button" onClick={undo} disabled={!history.length} title="Undo">
@@ -729,6 +883,7 @@ function App() {
   const [frames, setFrames] = useState([]);
   const [activePanel, setActivePanel] = useState('chat');
   const stageRef = useRef(null);
+  const [frameReplaceRequest, setFrameReplaceRequest] = useState(null);
 
   const canvasPresets = useMemo(() => ([
     {
@@ -902,6 +1057,10 @@ function App() {
   ]), []);
   const [canvasPreset, setCanvasPreset] = useState(canvasPresets[0]);
   const [presetCategory, setPresetCategory] = useState('standard');
+  const aspectRatio = useMemo(
+    () => toAspectRatio(canvasPreset.width, canvasPreset.height),
+    [canvasPreset]
+  );
   const handleDownload = () => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -914,16 +1073,12 @@ function App() {
     link.remove();
   };
 
-  const propsAssets = useMemo(() => (
-    Array.from({ length: 10 }, (_, idx) => {
-      const isPodium = idx % 2 === 0;
-      return {
-        id: isPodium ? `podium-${idx}` : `snake-plant-${idx}`,
-        name: isPodium ? 'Podium' : 'Snake Plant',
-        src: isPodium ? propPodium : propSnakePlant,
-      };
-    })
-  ), []);
+  const propsAssets = useMemo(() => ([
+    { id: 'podium-1', name: 'Podium', src: propPodium },
+    { id: 'snake-plant-1', name: 'Snake Plant', src: propSnakePlant },
+    { id: 'cherry-blossom-branch', name: 'Cherry Blossom Branch', src: propCherryBlossomBranch },
+    { id: 'creeping-plant-branch', name: 'Creeping Plant Branch', src: propCreepingPlantBranch },
+  ]), []);
 
   const backgroundAssets = useMemo(() => ([
     { id: 'bg-01', name: 'Warm Pink', src: bg01 },
@@ -1005,6 +1160,22 @@ function App() {
     });
   };
 
+  const replaceWithBackground = (src) => {
+    const safeSrc = getCanvasSafeUrl(src);
+    const backgroundFrame = {
+      id: `bg-${Date.now()}`,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      zIndex: 0,
+      selected: false,
+      src: safeSrc,
+      isBackground: true,
+    };
+    setFrameReplaceRequest([backgroundFrame]);
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1018,12 +1189,6 @@ function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <button className="icon-button" title="New Canvas">
-            <Icon name="grid" />
-          </button>
-          <button className="icon-button" title="Add Prop" onClick={() => setActivePanel('props')}>
-            <Icon name="plus" />
-          </button>
           <button className="icon-button primary" title="Download" onClick={handleDownload}>
             <Icon name="download" />
           </button>
@@ -1036,7 +1201,13 @@ function App() {
           addPhotoFrame={addPhotoFrame}
         />
         <div className="panel-stack">
-          {activePanel === 'chat' && <AIChatbot />}
+          {activePanel === 'chat' && (
+            <AIChatbot
+              getCanvasSnapshot={() => stageRef.current?.toDataURL({ pixelRatio: 1 }) || null}
+              onSelectGenerated={(url) => replaceWithBackground(url)}
+              aspectRatio={aspectRatio}
+            />
+          )}
           {activePanel === 'props' && (
             <PropsPanel
               open
@@ -1069,6 +1240,8 @@ function App() {
           stageRef={stageRef}
           presetCategory={presetCategory}
           onCategoryChange={setPresetCategory}
+          frameReplaceRequest={frameReplaceRequest}
+          onFrameReplaceApplied={() => setFrameReplaceRequest(null)}
           backgroundPanel={(
             <BackgroundPanel
               open={false}
@@ -1087,6 +1260,14 @@ function App() {
           )}
         />
       </div>
+      <button
+        className="feedback-fab"
+        type="button"
+        title="Send feedback"
+        onClick={() => window.alert('Share your feedback with us at support@example.com')}
+      >
+        ?
+      </button>
     </div>
   );
 }

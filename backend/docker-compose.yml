@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      KIE_API_KEY: ${KIE_API_KEY}
+      KIE_BASE_URL: ${KIE_BASE_URL:-https://api.kie.ai}
+      KIE_MODEL: ${KIE_MODEL:-flux-2/pro-image-to-image}
+      USE_S3: ${USE_S3:-0}
+      UPLOAD_DIR: /data/uploads
+      PUBLIC_FILE_BASE: ${PUBLIC_FILE_BASE:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./data:/data
