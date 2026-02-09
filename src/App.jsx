@@ -53,6 +53,8 @@ const Icon = ({ name }) => {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const PUBLIC_FILE_BASE = import.meta.env.VITE_PUBLIC_FILE_BASE || API_BASE_URL;
+const ENABLE_PROXY =
+  import.meta.env.VITE_ENABLE_PROXY === '1' || API_BASE_URL.includes('localhost');
 const DEFAULT_PROMPT_PREFIX =
   'Preserve the exact composition and all props from the reference image. ' +
   'Do NOT remove or replace any props, bottle, or shadows. ' +
@@ -79,7 +81,7 @@ const getCanvasSafeUrl = (url) => {
   if (!url) return url;
   if (url.startsWith('data:') || url.startsWith('blob:')) return url;
   if (url.startsWith(API_BASE_URL)) return url;
-  if (url.startsWith('http')) return toProxyUrl(url);
+  if (url.startsWith('http')) return ENABLE_PROXY ? toProxyUrl(url) : url;
   return url;
 };
 
