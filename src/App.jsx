@@ -55,7 +55,9 @@ const Icon = ({ name }) => {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const PUBLIC_FILE_BASE = import.meta.env.VITE_PUBLIC_FILE_BASE || API_BASE_URL;
 const ENABLE_PROXY =
-  import.meta.env.VITE_ENABLE_PROXY === '1' || API_BASE_URL.includes('localhost');
+  import.meta.env.VITE_ENABLE_PROXY
+    ? import.meta.env.VITE_ENABLE_PROXY === '1'
+    : true;
 const DEFAULT_PROMPT_PREFIX =
   'Preserve the exact composition and all props from the reference image. ' +
   'Do NOT remove or replace any props, bottle, or shadows. ' +
@@ -82,6 +84,7 @@ const getCanvasSafeUrl = (url) => {
   if (!url) return url;
   if (url.startsWith('data:') || url.startsWith('blob:')) return url;
   if (url.startsWith(API_BASE_URL)) return url;
+  if (typeof window !== 'undefined' && url.startsWith(window.location.origin)) return url;
   if (url.startsWith('http')) return ENABLE_PROXY ? toProxyUrl(url) : url;
   return url;
 };
@@ -349,7 +352,7 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   );
 }
 
-function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
+function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, collapsed, onToggle }) {
   // Chatbot state
   const models = [{ id: 'kie', name: 'KIE Flux' }];
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -434,7 +437,17 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
   };
   const showQuickPrompts = chat.length === 1 && chat[0].sender === 'bot';
   return (
-    <section className="ai-chatbot">
+    <section className={`ai-chatbot ${collapsed ? 'collapsed' : ''}`}>
+      <div className="chat-header-row">
+        <h3>AI Chat</h3>
+        <button
+          className="ghost-button small mobile-chat-toggle"
+          type="button"
+          onClick={onToggle}
+        >
+          {collapsed ? 'Open' : 'Close'}
+        </button>
+      </div>
       <div className="model-row compact">
         <label>Model</label>
         <Select
@@ -516,6 +529,9 @@ function CanvasImage({ frame, isSelected, onSelect, onChange, stageSize }) {
 
   useEffect(() => {
     const img = new window.Image();
+    if (frame.src && frame.src.startsWith('http')) {
+      img.crossOrigin = 'anonymous';
+    }
     img.src = frame.src;
     img.onload = () => setImage(img);
   }, [frame.src]);
@@ -890,6 +906,7 @@ function App() {
   const [activePanel, setActivePanel] = useState('chat');
   const stageRef = useRef(null);
   const [frameReplaceRequest, setFrameReplaceRequest] = useState(null);
+  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
 
   const canvasPresets = useMemo(() => ([
     {
@@ -1067,6 +1084,14 @@ function App() {
     () => toAspectRatio(canvasPreset.width, canvasPreset.height),
     [canvasPreset]
   );
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => setIsChatCollapsed(media.matches);
+    handleChange();
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, []);
   const handleDownload = () => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -1224,6 +1249,8 @@ function App() {
                 getCanvasSnapshot={() => stageRef.current?.toDataURL({ pixelRatio: 1 }) || null}
                 onSelectGenerated={(url) => replaceWithBackground(url)}
                 aspectRatio={aspectRatio}
+                collapsed={isChatCollapsed}
+                onToggle={() => setIsChatCollapsed((prev) => !prev)}
               />
             )}
             {activePanel === 'props' && (
