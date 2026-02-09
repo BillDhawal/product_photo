@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { removeBackground } from '@imgly/background-removal';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
 import { Button, Select, TextInput } from 'flowbite-react';
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import ChatBubbleOutlineRounded from '@mui/icons-material/ChatBubbleOutlineRounded';
 import ImageRounded from '@mui/icons-material/ImageRounded';
 import LayersRounded from '@mui/icons-material/LayersRounded';
@@ -1191,77 +1192,96 @@ function App() {
           </div>
         </div>
         <div className="topbar-actions">
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="ghost-button">Sign in</button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="ghost-button">Sign up</button>
+            </SignUpButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
           <button className="icon-button primary" title="Download" onClick={handleDownload}>
             <Icon name="download" />
           </button>
         </div>
       </header>
-      <div className="app-grid">
-        <Sidebar
-          activePanel={activePanel}
-          setActivePanel={setActivePanel}
-          addPhotoFrame={addPhotoFrame}
-        />
-        <div className="panel-stack">
-          {activePanel === 'chat' && (
-            <AIChatbot
-              getCanvasSnapshot={() => stageRef.current?.toDataURL({ pixelRatio: 1 }) || null}
-              onSelectGenerated={(url) => replaceWithBackground(url)}
-              aspectRatio={aspectRatio}
-            />
-          )}
-          {activePanel === 'props' && (
-            <PropsPanel
-              open
-              items={propsAssets}
-              onAdd={addPropFrame}
-              onClose={() => setActivePanel('chat')}
-            />
-          )}
-          {activePanel === 'background' && (
-            <BackgroundPanel
-              open
-              items={backgroundAssets}
-              onAdd={addBackgroundFrame}
-              onClose={() => setActivePanel('chat')}
-            />
-          )}
-          {activePanel === 'product' && (
-            <div className="empty-panel">
-              <h3>Product</h3>
-              <p>Upload and manage product images.</p>
-            </div>
-          )}
+      <SignedIn>
+        <div className="app-grid">
+          <Sidebar
+            activePanel={activePanel}
+            setActivePanel={setActivePanel}
+            addPhotoFrame={addPhotoFrame}
+          />
+          <div className="panel-stack">
+            {activePanel === 'chat' && (
+              <AIChatbot
+                getCanvasSnapshot={() => stageRef.current?.toDataURL({ pixelRatio: 1 }) || null}
+                onSelectGenerated={(url) => replaceWithBackground(url)}
+                aspectRatio={aspectRatio}
+              />
+            )}
+            {activePanel === 'props' && (
+              <PropsPanel
+                open
+                items={propsAssets}
+                onAdd={addPropFrame}
+                onClose={() => setActivePanel('chat')}
+              />
+            )}
+            {activePanel === 'background' && (
+              <BackgroundPanel
+                open
+                items={backgroundAssets}
+                onAdd={addBackgroundFrame}
+                onClose={() => setActivePanel('chat')}
+              />
+            )}
+            {activePanel === 'product' && (
+              <div className="empty-panel">
+                <h3>Product</h3>
+                <p>Upload and manage product images.</p>
+              </div>
+            )}
+          </div>
+          <Preview
+            frames={frames}
+            setFrames={setFrames}
+            canvasPreset={canvasPreset}
+            canvasPresets={canvasPresets}
+            onPresetChange={setCanvasPreset}
+            stageRef={stageRef}
+            presetCategory={presetCategory}
+            onCategoryChange={setPresetCategory}
+            frameReplaceRequest={frameReplaceRequest}
+            onFrameReplaceApplied={() => setFrameReplaceRequest(null)}
+            backgroundPanel={(
+              <BackgroundPanel
+                open={false}
+                items={backgroundAssets}
+                onAdd={addBackgroundFrame}
+                onClose={() => setActivePanel('chat')}
+              />
+            )}
+            propsPanel={(
+              <PropsPanel
+                open={false}
+                items={propsAssets}
+                onAdd={addPropFrame}
+                onClose={() => setActivePanel('chat')}
+              />
+            )}
+          />
         </div>
-        <Preview
-          frames={frames}
-          setFrames={setFrames}
-          canvasPreset={canvasPreset}
-          canvasPresets={canvasPresets}
-          onPresetChange={setCanvasPreset}
-          stageRef={stageRef}
-          presetCategory={presetCategory}
-          onCategoryChange={setPresetCategory}
-          frameReplaceRequest={frameReplaceRequest}
-          onFrameReplaceApplied={() => setFrameReplaceRequest(null)}
-          backgroundPanel={(
-            <BackgroundPanel
-              open={false}
-              items={backgroundAssets}
-              onAdd={addBackgroundFrame}
-              onClose={() => setActivePanel('chat')}
-            />
-          )}
-          propsPanel={(
-            <PropsPanel
-              open={false}
-              items={propsAssets}
-              onAdd={addPropFrame}
-              onClose={() => setActivePanel('chat')}
-            />
-          )}
-        />
-      </div>
+      </SignedIn>
+      <SignedOut>
+        <div className="empty-panel" style={{ maxWidth: 420, margin: '2rem auto' }}>
+          <h3>Sign in required</h3>
+          <p>Please sign in to access the studio.</p>
+        </div>
+      </SignedOut>
       <button
         className="feedback-fab"
         type="button"

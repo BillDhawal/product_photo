@@ -2,6 +2,8 @@
 node_modules/
 dist/
 .env
+.env.local
+.env.*
 .vite/
 .DS_Store
 .vscode/
