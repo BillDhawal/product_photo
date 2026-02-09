@@ -378,9 +378,12 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
       }
       const inputUrl = await uploadReferenceImage(referenceImage);
       const task = await createGenerationTask({ prompt: finalPrompt, inputUrl, aspectRatio });
-      const taskId = task?.data?.taskId;
+      if (task?.code && task.code !== 200) {
+        throw new Error(task?.msg || 'Generation failed.');
+      }
+      const taskId = task?.data?.taskId || task?.data?.recordId;
       if (!taskId) {
-        throw new Error('KIE task ID missing.');
+        throw new Error(task?.msg || 'KIE task ID missing.');
       }
       let status;
       for (let i = 0; i < 20; i += 1) {
