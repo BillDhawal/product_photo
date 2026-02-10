@@ -6,7 +6,7 @@ from typing import Optional
 import requests
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 
@@ -30,6 +30,12 @@ app.add_middleware(
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/files", StaticFiles(directory=UPLOAD_DIR), name="files")
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,OPTIONS",
+    "Access-Control-Allow-Headers": "*",
+}
 
 
 def require_api_key() -> None:
@@ -131,14 +137,29 @@ def task_status(task_id: str) -> JSONResponse:
 
 
 @app.get("/proxy")
-def proxy_asset(url: str) -> StreamingResponse:
+def proxy_asset(url: Optional[str] = None) -> StreamingResponse:
     if not url:
-        raise HTTPException(status_code=400, detail="Missing url")
+        raise HTTPException(status_code=400, detail="Missing url", headers=CORS_HEADERS)
     try:
         response = requests.get(url, stream=True, timeout=30)
     except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=str(exc), headers=CORS_HEADERS) from exc
     if not response.ok:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text,
+            headers=CORS_HEADERS,
+        )
     content_type = response.headers.get("content-type", "application/octet-stream")
-    return StreamingResponse(response.iter_content(chunk_size=1024 * 256), media_type=content_type)
+    return StreamingResponse(
+        response.iter_content(chunk_size=1024 * 256),
+        media_type=content_type,
+        headers=CORS_HEADERS,
+    )
+
+
+@app.options("/proxy")
+def proxy_options() -> Response:
+    return Response(
+        headers=CORS_HEADERS
+    )

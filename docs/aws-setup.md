@@ -54,8 +54,55 @@ Create an HTTP API with routes:
 - `POST /upload` → Lambda
 - `POST /generate` → Lambda
 - `GET /status` → Lambda
+- `GET /proxy` → Lambda
 
 Enable CORS for your frontend domain.
+
+### CORS + Proxy Fix (Lambda redeploy)
+If `/proxy` returns CORS errors or 404s, redeploy the container and confirm CORS headers.
+
+Rebuild + push image (from `backend/`):
+```
+docker buildx build \
+  --platform linux/arm64 \
+  -t <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest \
+  -f Dockerfile \
+  --push \
+  --provenance=false \
+  --sbom=false \
+  --output=type=registry,oci-mediatypes=false \
+  .
+```
+
+Update Lambda image:
+```
+aws lambda update-function-code \
+  --region <REGION> \
+  --function-name product-photo-api \
+  --image-uri <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest
+```
+
+For HTTP API (API Gateway v2), set CORS:
+```
+aws apigatewayv2 update-api \
+  --region <REGION> \
+  --api-id <API_ID> \
+  --cors-configuration 'AllowOrigins=["*"],AllowMethods=["GET","POST","OPTIONS"],AllowHeaders=["*"]'
+```
+
+Confirm routes include `/proxy`:
+```
+aws apigatewayv2 get-routes --region <REGION> --api-id <API_ID>
+```
+
+Test with a known live image URL:
+```
+curl -I "https://<API_ID>.execute-api.<REGION>.amazonaws.com/proxy?url=https%3A%2F%2Fvia.placeholder.com%2F1200.png"
+```
+
+You should see:
+- `HTTP/2 200`
+- `Access-Control-Allow-Origin: *`
 
 ## 5) Frontend flow
 

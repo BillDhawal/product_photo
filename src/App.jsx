@@ -238,13 +238,6 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
           <PhotoCameraRounded />
         </button>
         <button
-          className={`icon-tile ${activePanel === 'chat' ? 'active' : ''}`}
-          onClick={() => setActivePanel('chat')}
-          title="Chatbot"
-        >
-          <ChatBubbleOutlineRounded />
-        </button>
-        <button
           className={`icon-tile ${activePanel === 'props' ? 'active' : ''}`}
           onClick={() => setActivePanel('props')}
           title="Props"
@@ -257,6 +250,13 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
           title="Backgrounds"
         >
           <ImageRounded />
+        </button>
+        <button
+          className={`icon-tile ${activePanel === 'chat' ? 'active' : ''}`}
+          onClick={() => setActivePanel('chat')}
+          title="Chatbot"
+        >
+          <ChatBubbleOutlineRounded />
         </button>
       </div>
       <input
@@ -352,7 +352,7 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   );
 }
 
-function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, collapsed, onToggle }) {
+function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
   // Chatbot state
   const models = [{ id: 'kie', name: 'KIE Flux' }];
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -437,16 +437,9 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, collapse
   };
   const showQuickPrompts = chat.length === 1 && chat[0].sender === 'bot';
   return (
-    <section className={`ai-chatbot ${collapsed ? 'collapsed' : ''}`}>
+    <section className="ai-chatbot">
       <div className="chat-header-row">
         <h3>AI Chat</h3>
-        <button
-          className="ghost-button small mobile-chat-toggle"
-          type="button"
-          onClick={onToggle}
-        >
-          {collapsed ? 'Open' : 'Close'}
-        </button>
       </div>
       <div className="model-row compact">
         <label>Model</label>
@@ -906,7 +899,6 @@ function App() {
   const [activePanel, setActivePanel] = useState('chat');
   const stageRef = useRef(null);
   const [frameReplaceRequest, setFrameReplaceRequest] = useState(null);
-  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
 
   const canvasPresets = useMemo(() => ([
     {
@@ -1085,13 +1077,6 @@ function App() {
     [canvasPreset]
   );
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 1024px)');
-    const handleChange = () => setIsChatCollapsed(media.matches);
-    handleChange();
-    media.addEventListener('change', handleChange);
-    return () => media.removeEventListener('change', handleChange);
-  }, []);
   const handleDownload = () => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -1204,7 +1189,8 @@ function App() {
       src: safeSrc,
       isBackground: true,
     };
-    setFrameReplaceRequest([backgroundFrame]);
+    // Replace scene with AI background only; undo restores prior frames.
+    setFrameReplaceRequest([{ ...backgroundFrame, zIndex: 0 }]);
   };
 
   return (
@@ -1249,8 +1235,6 @@ function App() {
                 getCanvasSnapshot={() => stageRef.current?.toDataURL({ pixelRatio: 1 }) || null}
                 onSelectGenerated={(url) => replaceWithBackground(url)}
                 aspectRatio={aspectRatio}
-                collapsed={isChatCollapsed}
-                onToggle={() => setIsChatCollapsed((prev) => !prev)}
               />
             )}
             {activePanel === 'props' && (
