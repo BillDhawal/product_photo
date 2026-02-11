@@ -9,6 +9,8 @@ services:
       KIE_API_KEY: ${KIE_API_KEY}
       KIE_BASE_URL: ${KIE_BASE_URL:-https://api.kie.ai}
       KIE_MODEL: ${KIE_MODEL:-flux-2/pro-image-to-image}
+      VECTEEZY_API_KEY: ${VECTEEZY_API_KEY:-}
+      VECTEEZY_ACCOUNT_ID: ${VECTEEZY_ACCOUNT_ID:-}
       USE_S3: ${USE_S3:-0}
       UPLOAD_DIR: /data/uploads
       PUBLIC_FILE_BASE: ${PUBLIC_FILE_BASE:-}

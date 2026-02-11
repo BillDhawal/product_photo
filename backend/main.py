@@ -17,6 +17,9 @@ KIE_MODEL = os.getenv("KIE_MODEL", "flux-2/pro-image-to-image")
 USE_S3 = os.getenv("USE_S3", "0") == "1"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
 PUBLIC_FILE_BASE = os.getenv("PUBLIC_FILE_BASE", "")
+VECTEEZY_API_KEY = os.getenv("VECTEEZY_API_KEY", "")
+VECTEEZY_ACCOUNT_ID = os.getenv("VECTEEZY_ACCOUNT_ID", "")
+VECTEEZY_BASE_URL = "https://api.vecteezy.com"
 
 
 app = FastAPI(title=APP_TITLE)
@@ -41,6 +44,13 @@ CORS_HEADERS = {
 def require_api_key() -> None:
     if not KIE_API_KEY:
         raise HTTPException(status_code=500, detail="KIE_API_KEY is not configured")
+
+
+def require_vecteezy_config() -> None:
+    if not VECTEEZY_API_KEY:
+        raise HTTPException(status_code=500, detail="VECTEEZY_API_KEY is not configured")
+    if not VECTEEZY_ACCOUNT_ID:
+        raise HTTPException(status_code=500, detail="VECTEEZY_ACCOUNT_ID is not configured")
 
 
 def get_public_url(filename: str) -> str:
@@ -198,3 +208,44 @@ def proxy_options() -> Response:
     return Response(
         headers=CORS_HEADERS
     )
+
+
+@app.get("/vecteezy/resources")
+def vecteezy_resources(
+    term: str,
+    content_type: str = "png",
+    page: int = 1,
+    per_page: int = 12,
+    sort_by: str = "relevance",
+    license_type: str = "commercial",
+    ai_generated: Optional[bool] = None,
+) -> JSONResponse:
+    require_vecteezy_config()
+    if per_page > 100:
+        per_page = 100
+    if page < 1:
+        page = 1
+
+    params = {
+        "term": term,
+        "content_type": content_type,
+        "page": page,
+        "per_page": per_page,
+        "sort_by": sort_by,
+        "license_type": license_type,
+    }
+    if ai_generated is not None:
+        params["ai_generated"] = ai_generated
+
+    response = requests.get(
+        f"{VECTEEZY_BASE_URL}/v2/{VECTEEZY_ACCOUNT_ID}/resources",
+        headers={
+            "accept": "application/json",
+            "Authorization": f"Bearer {VECTEEZY_API_KEY}",
+        },
+        params=params,
+        timeout=60,
+    )
+    if not response.ok:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+    return JSONResponse(response.json())

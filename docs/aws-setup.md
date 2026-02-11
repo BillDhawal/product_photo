@@ -49,13 +49,11 @@ aws ecr get-login-password --region <REGION> | \
   docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
 
 docker buildx build \
-  --platform linux/arm64 \
+  --platform linux/amd64 \
   -t <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest \
-  -f Dockerfile \
-  --push \
   --provenance=false \
   --sbom=false \
-  --output=type=registry,oci-mediatypes=false \
+  --push \
   .
 ```
 
@@ -69,6 +67,8 @@ docker buildx build \
   - `KIE_API_KEY`
   - `KIE_BASE_URL`
   - `KIE_MODEL`
+  - `VECTEEZY_API_KEY`
+  - `VECTEEZY_ACCOUNT_ID`
   - `USE_S3=1`
   - `S3_BUCKET=product-photo-uploads`
   - `AWS_REGION=<region>`
@@ -88,7 +88,7 @@ Set env vars:
 aws lambda update-function-configuration \
   --function-name product-photo-api \
   --region <REGION> \
-  --environment "Variables={KIE_API_KEY=<REDACTED>,KIE_BASE_URL=https://api.kie.ai,KIE_MODEL=flux-2/pro-image-to-image,USE_S3=1,S3_BUCKET=product-photo-uploads,UPLOAD_DIR=/tmp/uploads}"
+  --environment "Variables={KIE_API_KEY=<REDACTED>,KIE_BASE_URL=https://api.kie.ai,KIE_MODEL=flux-2/pro-image-to-image,VECTEEZY_API_KEY=<REDACTED>,VECTEEZY_ACCOUNT_ID=<ACCOUNT_ID>,USE_S3=1,S3_BUCKET=product-photo-uploads,UPLOAD_DIR=/tmp/uploads}"
 ```
 
 ## 4) API Gateway
@@ -108,13 +108,11 @@ If `/proxy` returns CORS errors or 404s, redeploy the container and confirm CORS
 Rebuild + push image (from `backend/`):
 ```
 docker buildx build \
-  --platform linux/arm64 \
+  --platform linux/amd64 \
   -t <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest \
-  -f Dockerfile \
-  --push \
   --provenance=false \
   --sbom=false \
-  --output=type=registry,oci-mediatypes=false \
+  --push \
   .
 ```
 

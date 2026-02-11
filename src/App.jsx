@@ -58,10 +58,13 @@ const ENABLE_PROXY =
   import.meta.env.VITE_ENABLE_PROXY
     ? import.meta.env.VITE_ENABLE_PROXY === '1'
     : true;
+const VECTEEZY_PROPS_TERM = import.meta.env.VITE_VECTEEZY_PROPS_TERM || 'flower, plant';
+const VECTEEZY_PROPS_PER_PAGE = Number(import.meta.env.VITE_VECTEEZY_PROPS_PER_PAGE || 12);
 const DEFAULT_PROMPT_PREFIX =
-  'Preserve the exact composition and all props from the reference image. ' +
-  'Do NOT remove or replace any props, bottle, or shadows. ' +
-  'Only refine lighting, background texture, and overall realism.';
+  'Keep the overall composition and include the props, but do not copy them rigidly. ' +
+  'Props can be adjusted to better suit the product while staying consistent with the scene. ' +
+  'Preserve all readable product text and logos exactly as in the reference (no misspellings or gibberish). ' +
+  'Refine lighting, background texture, and overall realism without removing key elements.';
 
 const dataUrlToBlob = (dataUrl) => {
   const [header, base64] = dataUrl.split(',');
@@ -940,7 +943,26 @@ function BackgroundPanel({ open, items, onAdd, onClose }) {
   );
 }
 
-function PropsPanel({ open, items, onAdd, onClose }) {
+function PropsPanel({
+  open,
+  items,
+  onAdd,
+  onClose,
+  onLoadMore,
+  hasMore,
+  loading,
+  error,
+  searchValue,
+  onSearch,
+}) {
+  const handleScroll = (event) => {
+    if (!onLoadMore || !hasMore || loading) return;
+    const target = event.currentTarget;
+    const threshold = 120;
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - threshold) {
+      onLoadMore();
+    }
+  };
   return (
     <aside className={`props-panel ${open ? 'open' : ''}`}>
       <div className="props-panel-header">
@@ -950,13 +972,30 @@ function PropsPanel({ open, items, onAdd, onClose }) {
         </div>
         <button className="ghost-button" onClick={onClose}>Close</button>
       </div>
-      <div className="props-grid">
+      <div className="props-search">
+        <TextInput
+          sizing="sm"
+          value={searchValue}
+          onChange={(event) => onSearch?.(event.target.value)}
+          placeholder="Search props (e.g., leaf, hand, plant)"
+        />
+      </div>
+      <div className="props-grid" onScroll={handleScroll}>
         {items.map(item => (
           <button key={item.id} className="props-card" onClick={() => onAdd(item.src)}>
             <img src={item.src} alt={item.name} />
             <span>{item.name}</span>
           </button>
         ))}
+        {loading && (
+          <div className="props-grid-footer">Loading more…</div>
+        )}
+        {error && (
+          <div className="props-grid-footer error">{error}</div>
+        )}
+        {!hasMore && items.length > 0 && (
+          <div className="props-grid-footer">End of results</div>
+        )}
       </div>
     </aside>
   );
@@ -967,6 +1006,12 @@ function App() {
   const [activePanel, setActivePanel] = useState('chat');
   const stageRef = useRef(null);
   const [frameReplaceRequest, setFrameReplaceRequest] = useState(null);
+  const [remoteProps, setRemoteProps] = useState([]);
+  const [propsPage, setPropsPage] = useState(1);
+  const [propsHasMore, setPropsHasMore] = useState(true);
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [propsError, setPropsError] = useState('');
+  const [propsSearch, setPropsSearch] = useState(VECTEEZY_PROPS_TERM);
 
   const canvasPresets = useMemo(() => ([
     {
@@ -1163,6 +1208,7 @@ function App() {
     { id: 'cherry-blossom-branch', name: 'Cherry Blossom Branch', src: propCherryBlossomBranch },
     { id: 'creeping-plant-branch', name: 'Creeping Plant Branch', src: propCreepingPlantBranch },
   ]), []);
+  const propLibraryItems = remoteProps.length ? remoteProps : propsAssets;
 
   const backgroundAssets = useMemo(() => ([
     { id: 'bg-01', name: 'Warm Pink', src: bg01 },
@@ -1204,7 +1250,8 @@ function App() {
 
   const addPropFrame = (src) => {
     const img = new window.Image();
-    img.src = src;
+    const safeSrc = getCanvasSafeUrl(src);
+    img.src = safeSrc;
     img.onload = () => {
       const maxInitialSize = 240;
       const scale = Math.min(1, maxInitialSize / Math.max(img.naturalWidth, img.naturalHeight));
@@ -1220,13 +1267,14 @@ function App() {
           height: scaledHeight,
           zIndex: prev.length + 1,
           selected: false,
-          src,
+          src: safeSrc,
         },
       ]);
     };
   };
 
   const addBackgroundFrame = (src) => {
+    const safeSrc = getCanvasSafeUrl(src);
     setFrames((prev) => {
       const minZ = prev.length ? Math.min(...prev.map(f => f.zIndex)) : 0;
       const backgroundFrame = {
@@ -1237,7 +1285,7 @@ function App() {
         height: 0,
         zIndex: minZ - 1,
         selected: false,
-        src,
+        src: safeSrc,
         isBackground: true,
       };
       return [...prev.filter(f => !f.isBackground), backgroundFrame];
@@ -1259,6 +1307,65 @@ function App() {
     };
     // Replace scene with AI background only; undo restores prior frames.
     setFrameReplaceRequest([{ ...backgroundFrame, zIndex: 0 }]);
+  };
+
+  const fetchPropsPage = async (pageToLoad = 1, termOverride = propsSearch) => {
+    if (propsLoading) return;
+    setPropsLoading(true);
+    setPropsError('');
+    try {
+      const params = new URLSearchParams({
+        term: termOverride,
+        content_type: 'png',
+        page: String(pageToLoad),
+        per_page: String(VECTEEZY_PROPS_PER_PAGE),
+        sort_by: 'relevance',
+        license_type: 'commercial',
+      });
+      const response = await fetch(`${API_BASE_URL}/vecteezy/resources?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load props (status ${response.status}).`);
+      }
+      const payload = await response.json();
+      const resources = Array.isArray(payload?.resources) ? payload.resources : [];
+      const mapped = resources
+        .map((item) => ({
+          id: `vecteezy-${item.id}`,
+          name: item.title || `Prop ${item.id}`,
+          src: item.thumbnail_2x_url || item.thumbnail_url,
+        }))
+        .filter((item) => item.src);
+      setRemoteProps((prev) => (pageToLoad === 1 ? mapped : [...prev, ...mapped]));
+      setPropsPage(pageToLoad);
+      const lastPage = Number(payload?.last_page || pageToLoad);
+      setPropsHasMore(pageToLoad < lastPage);
+    } catch (error) {
+      setPropsError(error.message || 'Failed to load props.');
+    } finally {
+      setPropsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activePanel === 'props' && remoteProps.length === 0 && !propsLoading) {
+      fetchPropsPage(1);
+    }
+  }, [activePanel, remoteProps.length, propsLoading]);
+
+  useEffect(() => {
+    const trimmed = propsSearch.trim();
+    if (!trimmed || activePanel !== 'props') return;
+    const handle = setTimeout(() => {
+      setRemoteProps([]);
+      setPropsHasMore(true);
+      fetchPropsPage(1, trimmed);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [propsSearch, activePanel]);
+
+  const handlePropsLoadMore = () => {
+    if (propsLoading || !propsHasMore) return;
+    fetchPropsPage(propsPage + 1);
   };
 
   return (
@@ -1308,9 +1415,15 @@ function App() {
             {activePanel === 'props' && (
               <PropsPanel
                 open
-                items={propsAssets}
+                    items={propLibraryItems}
                 onAdd={addPropFrame}
                 onClose={() => setActivePanel('chat')}
+                    onLoadMore={handlePropsLoadMore}
+                    hasMore={propsHasMore}
+                    loading={propsLoading}
+                    error={propsError}
+                    searchValue={propsSearch}
+                    onSearch={setPropsSearch}
               />
             )}
             {activePanel === 'background' && (
@@ -1350,9 +1463,15 @@ function App() {
             propsPanel={(
               <PropsPanel
                 open={false}
-                items={propsAssets}
+                    items={propLibraryItems}
                 onAdd={addPropFrame}
                 onClose={() => setActivePanel('chat')}
+                    onLoadMore={handlePropsLoadMore}
+                    hasMore={propsHasMore}
+                    loading={propsLoading}
+                    error={propsError}
+                    searchValue={propsSearch}
+                    onSearch={setPropsSearch}
               />
             )}
           />

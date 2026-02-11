@@ -22,6 +22,13 @@ docker compose up --build
 
 Backend runs at `http://localhost:8000`.
 
+### Update backend after code changes
+```
+cd backend
+docker compose down
+docker compose up --build
+```
+
 ---
 
 ## 2) Cloudflare Tunnel
