@@ -95,6 +95,24 @@ const toAspectRatio = (width, height) => {
   return `${width / divisor}:${height / divisor}`;
 };
 
+const toIdeogramSize = (ratio, resolution = '1K') => {
+  const isHd = resolution === '2K';
+  switch (ratio) {
+    case '1:1':
+      return isHd ? 'square_hd' : 'square';
+    case '4:3':
+      return 'landscape_4_3';
+    case '3:4':
+      return 'portrait_4_3';
+    case '16:9':
+      return 'landscape_16_9';
+    case '9:16':
+      return 'portrait_16_9';
+    default:
+      return isHd ? 'square_hd' : 'square';
+  }
+};
+
 const uploadReferenceImage = async (dataUrl) => {
   const formData = new FormData();
   formData.append('file', dataUrlToBlob(dataUrl), 'reference.jpg');
@@ -113,7 +131,21 @@ const uploadReferenceImage = async (dataUrl) => {
   return url.startsWith('http') ? url : joinUrl(PUBLIC_FILE_BASE, url);
 };
 
-const createGenerationTask = async ({ prompt, inputUrl, aspectRatio = '4:3', resolution = '1K' }) => {
+const createGenerationTask = async ({
+  prompt,
+  inputUrl,
+  aspectRatio = '4:3',
+  resolution = '1K',
+  model,
+  quality,
+  imageSize,
+  renderingSpeed,
+  style,
+  numImages,
+  seed,
+  imageInput,
+  outputFormat
+}) => {
   const response = await fetch(`${API_BASE_URL}/generate`, {
     method: 'POST',
     headers: {
@@ -123,7 +155,16 @@ const createGenerationTask = async ({ prompt, inputUrl, aspectRatio = '4:3', res
       input_url: inputUrl,
       prompt,
       aspect_ratio: aspectRatio,
-      resolution
+      resolution,
+      ...(model ? { model } : {}),
+      ...(quality ? { quality } : {}),
+      ...(imageSize ? { image_size: imageSize } : {}),
+      ...(renderingSpeed ? { rendering_speed: renderingSpeed } : {}),
+      ...(style ? { style } : {}),
+      ...(numImages ? { num_images: numImages } : {}),
+      ...(seed !== undefined ? { seed } : {}),
+      ...(imageInput ? { image_input: imageInput } : {}),
+      ...(outputFormat ? { output_format: outputFormat } : {})
     })
   });
   if (!response.ok) {
@@ -354,7 +395,12 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
 
 function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
   // Chatbot state
-  const models = [{ id: 'kie', name: 'KIE Flux' }];
+  const models = [
+    { id: 'flux-2/pro-image-to-image', name: 'Flux 2 (Image-to-Image)' },
+    { id: 'gpt-image/1.5-image-to-image', name: 'GPT Image 1.5 (Image-to-Image)' },
+    { id: 'ideogram/v3-reframe', name: 'Ideogram v3 Reframe' },
+    { id: 'nano-banana-pro', name: 'Nano Banana Pro' }
+  ];
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -380,7 +426,29 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
         throw new Error('Capture a canvas image before generating.');
       }
       const inputUrl = await uploadReferenceImage(referenceImage);
-      const task = await createGenerationTask({ prompt: finalPrompt, inputUrl, aspectRatio });
+      const quality =
+        selectedModel === 'gpt-image/1.5-image-to-image' ? 'medium' : undefined;
+      const imageSize =
+        selectedModel === 'ideogram/v3-reframe'
+          ? toIdeogramSize(aspectRatio, '1K')
+          : undefined;
+      const outputFormat =
+        selectedModel === 'nano-banana-pro' ? 'png' : undefined;
+      const imageInput =
+        selectedModel === 'nano-banana-pro' && inputUrl ? [inputUrl] : undefined;
+      const task = await createGenerationTask({
+        prompt: finalPrompt,
+        inputUrl,
+        aspectRatio,
+        model: selectedModel,
+        quality,
+        imageSize,
+        renderingSpeed: selectedModel === 'ideogram/v3-reframe' ? 'BALANCED' : undefined,
+        style: selectedModel === 'ideogram/v3-reframe' ? 'AUTO' : undefined,
+        numImages: selectedModel === 'ideogram/v3-reframe' ? '2' : undefined,
+        imageInput,
+        outputFormat
+      });
       if (task?.code && task.code !== 200) {
         throw new Error(task?.msg || 'Generation failed.');
       }

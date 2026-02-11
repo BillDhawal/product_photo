@@ -95,10 +95,50 @@ def create_task(payload: dict) -> JSONResponse:
     prompt = payload.get("prompt")
     aspect_ratio = payload.get("aspect_ratio", "4:3")
     resolution = payload.get("resolution", "1K")
+    quality = payload.get("quality")
     model = payload.get("model", KIE_MODEL)
+    image_size = payload.get("image_size")
+    rendering_speed = payload.get("rendering_speed")
+    style = payload.get("style")
+    num_images = payload.get("num_images")
+    seed = payload.get("seed")
+    image_input = payload.get("image_input")
+    output_format = payload.get("output_format")
 
-    if not input_url or not prompt:
-        raise HTTPException(status_code=400, detail="input_url and prompt are required")
+    if model == "ideogram/v3-reframe":
+        if not input_url or not image_size:
+            raise HTTPException(
+                status_code=400,
+                detail="input_url and image_size are required for ideogram/v3-reframe",
+            )
+        input_payload = {
+            "image_url": input_url,
+            "image_size": image_size,
+            **({"rendering_speed": rendering_speed} if rendering_speed else {}),
+            **({"style": style} if style else {}),
+            **({"num_images": num_images} if num_images else {}),
+            **({"seed": seed} if seed is not None else {}),
+        }
+    elif model == "nano-banana-pro":
+        if not prompt:
+            raise HTTPException(status_code=400, detail="prompt is required for nano-banana-pro")
+        input_payload = {
+            "prompt": prompt,
+            **({"image_input": image_input} if image_input else {}),
+            **({"aspect_ratio": aspect_ratio} if aspect_ratio else {}),
+            **({"resolution": resolution} if resolution else {}),
+            **({"output_format": output_format} if output_format else {}),
+        }
+    else:
+        if not input_url or not prompt:
+            raise HTTPException(status_code=400, detail="input_url and prompt are required")
+        input_payload = {
+            "input_urls": [input_url],
+            "prompt": prompt,
+            "aspect_ratio": aspect_ratio,
+            "resolution": resolution,
+            **({"quality": quality} if quality else {}),
+        }
 
     response = requests.post(
         f"{KIE_BASE_URL}/api/v1/jobs/createTask",
@@ -108,12 +148,7 @@ def create_task(payload: dict) -> JSONResponse:
         },
         json={
             "model": model,
-            "input": {
-                "input_urls": [input_url],
-                "prompt": prompt,
-                "aspect_ratio": aspect_ratio,
-                "resolution": resolution,
-            },
+            "input": input_payload,
         },
         timeout=60,
     )

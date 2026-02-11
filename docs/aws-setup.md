@@ -1,6 +1,6 @@
 # AWS Setup Guide (Lambda + S3 + API Gateway)
 
-This guide shows how to deploy the **image generation service** securely with **S3 + Lambda + API Gateway**.
+This guide shows how to deploy the **image generation service** securely with **S3 + Lambda + API Gateway** and includes the exact commands used during deployment (sanitized).
 
 ## 1) Create S3 bucket
 
@@ -17,20 +17,46 @@ Create an IAM role for Lambda with:
 - `s3:GetObject` on `product-photo-uploads/*` (or use presigned GETs)
 - `logs:*` for CloudWatch
 
+Example inline policy (as configured):
+
+```
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::product-photo-uploads/uploads/*"
+    }
+  ]
+}
+```
+
 ## 3) Deploy Lambda (container image)
 
-### Build & push to ECR
+### Build & push to ECR (Elastic Container Registry)
+
+Run from `backend/`:
 
 ```
-aws ecr create-repository --repository-name product-photo-api
-```
+aws ecr create-repository --repository-name product-photo-api --region <REGION>
 
-Get the repository URI and then:
+aws ecr get-login-password --region <REGION> | \
+  docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
 
-```
-docker build -t product-photo-api backend
-docker tag product-photo-api <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest
-docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest
+docker buildx build \
+  --platform linux/arm64 \
+  -t <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest \
+  -f Dockerfile \
+  --push \
+  --provenance=false \
+  --sbom=false \
+  --output=type=registry,oci-mediatypes=false \
+  .
 ```
 
 ### Create Lambda
@@ -46,6 +72,24 @@ docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest
   - `USE_S3=1`
   - `S3_BUCKET=product-photo-uploads`
   - `AWS_REGION=<region>`
+
+Update the Lambda image:
+
+```
+aws lambda update-function-code \
+  --region <REGION> \
+  --function-name product-photo-api \
+  --image-uri <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/product-photo-api:latest
+```
+
+Set env vars:
+
+```
+aws lambda update-function-configuration \
+  --function-name product-photo-api \
+  --region <REGION> \
+  --environment "Variables={KIE_API_KEY=<REDACTED>,KIE_BASE_URL=https://api.kie.ai,KIE_MODEL=flux-2/pro-image-to-image,USE_S3=1,S3_BUCKET=product-photo-uploads,UPLOAD_DIR=/tmp/uploads}"
+```
 
 ## 4) API Gateway
 
@@ -517,7 +561,9 @@ curl -X POST https://<API_URL>/generate \
     "input_url": "https://<S3_OR_PUBLIC_URL>",
     "prompt": "Preserve props, refine lighting",
     "aspect_ratio": "4:3",
-    "resolution": "1K"
+    "resolution": "1K",
+    "model": "gpt-image/1.5-image-to-image",
+    "quality": "medium"
   }'
 ```
 
@@ -525,3 +571,19 @@ Status:
 ```
 curl "https://<API_URL>/status?task_id=<TASK_ID>"
 ```
+
+## Model options
+
+- `flux-2/pro-image-to-image`
+- `gpt-image/1.5-image-to-image` (supports `quality: medium | high`)
+- `ideogram/v3-reframe` (uses `image_url`, `image_size`, optional `rendering_speed`, `style`, `num_images`, `seed`)
+- `nano-banana-pro` (uses `prompt`, optional `image_input`, `aspect_ratio`, `resolution`, `output_format`)
+
+---
+
+
+
+
+
+# TODO:
+What do we excatly store in AWS S3 bucket, How do we clear storage. what is the time limits.
