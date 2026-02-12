@@ -29,6 +29,24 @@ import bg07 from './assets/backgrounds/background-07.jpg';
 import bg08 from './assets/backgrounds/background-08.jpg';
 import bg09 from './assets/backgrounds/background-09.jpg';
 import bg10 from './assets/backgrounds/background-10.jpg';
+import transparentLogo from './assets/logo/transparent-logo_cropped.png';
+import cameraLogo from './assets/logo/transparent-logo_camera_cropped.png';
+
+const uploadExampleImages = import.meta.glob('./assets/upload_good_bad_example/*', {
+  eager: true,
+  import: 'default',
+});
+
+const getUploadExamples = () => {
+  const assets = Object.entries(uploadExampleImages).map(([path, src]) => ({
+    path,
+    src,
+    name: path.split('/').pop() || '',
+  }));
+  const good = assets.find((item) => item.name.toLowerCase().includes('bottle'));
+  const bad = assets.filter((item) => item !== good);
+  return { good, bad };
+};
 
 const Icon = ({ name }) => {
   const paths = {
@@ -194,6 +212,7 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   const [backgroundThreshold, setBackgroundThreshold] = useState(10);
   const [showUploadGuide, setShowUploadGuide] = useState(false);
   const [hideGuideNextTime, setHideGuideNextTime] = useState(false);
+  const uploadExamples = useMemo(() => getUploadExamples(), []);
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -273,6 +292,9 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
 
   return (
     <aside className="sidebar">
+      <div className="sidebar-logo" aria-hidden="true">
+        <img src={cameraLogo} alt="" />
+      </div>
       <div className="icon-sidebar">
         <button
           className={`icon-tile ${activePanel === 'product' ? 'active' : ''}`}
@@ -335,17 +357,71 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
             </div>
             <div className="upload-guide-body">
               <div className="guide-section good">
-                <div className="guide-title">Good example</div>
+                <div className="guide-title">
+                  <span className="guide-icon good" aria-hidden="true">
+                    <svg className="guide-icon-svg" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                      <circle cx="9" cy="10" r="1" fill="currentColor" />
+                      <circle cx="15" cy="10" r="1" fill="currentColor" />
+                      <path
+                        d="M8.5 14.2c1.1 1.3 2.6 2 3.5 2s2.4-.7 3.5-2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                  Good example
+                </div>
                 <div className="guide-text">Undistorted angle product photo.</div>
+                {uploadExamples.good?.src && (
+                  <div className="guide-images">
+                    <img
+                      className="guide-image"
+                      src={uploadExamples.good.src}
+                      alt="Good example"
+                    />
+                  </div>
+                )}
               </div>
               <div className="guide-section bad">
-                <div className="guide-title">Bad examples</div>
-                <ul>
-                  <li>Portrait photo</li>
-                  <li>Distorted angle</li>
-                  <li>Cut-off edges</li>
-                  <li>Group photo</li>
-                </ul>
+                <div className="guide-title">
+                  <span className="guide-icon bad" aria-hidden="true">
+                    <svg className="guide-icon-svg" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                      <circle cx="9" cy="10" r="1" fill="currentColor" />
+                      <circle cx="15" cy="10" r="1" fill="currentColor" />
+                      <path
+                        d="M8.5 15.6c1.1-1.3 2.6-2 3.5-2s2.4.7 3.5 2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                  Bad example
+                </div>
+                {uploadExamples.bad.length ? (
+                  <div className="guide-image-grid">
+                    {uploadExamples.bad.map((item) => (
+                      <img
+                        key={item.path}
+                        className="guide-image"
+                        src={item.src}
+                        alt="Bad example"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <ul>
+                    <li>Portrait photo</li>
+                    <li>Distorted angle</li>
+                    <li>Cut-off edges</li>
+                    <li>Group photo</li>
+                  </ul>
+                )}
               </div>
               <div className="control-block modal">
                 <div className="control-header">
@@ -566,7 +642,7 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
           )}
         </div>
         <div className="chat-input">
-          <TextInput
+          <input
             type="text"
             placeholder="Type your prompt..."
             value={prompt}
@@ -984,7 +1060,6 @@ function PropsPanel({
         {items.map(item => (
           <button key={item.id} className="props-card" onClick={() => onAdd(item.src)}>
             <img src={item.src} alt={item.name} />
-            <span>{item.name}</span>
           </button>
         ))}
         {loading && (
@@ -1373,11 +1448,7 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <div className="brand-icon">
-            <Icon name="wand" />
-          </div>
-          <div>
-            <h1>Product Photo Studio</h1>
-            <span>AI-assisted scenes & props</span>
+            <img src={transparentLogo} alt="prodshoots.ai logo" />
           </div>
         </div>
         <div className="topbar-actions">

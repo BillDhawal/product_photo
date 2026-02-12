@@ -11,6 +11,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
 ENV AWS_LWA_PORT=8000
 ENV AWS_LWA_READINESS_CHECK_PATH=/health
+ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/extensions/lambda-adapter
 
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 

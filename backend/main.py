@@ -31,7 +31,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    # Lambda runtime filesystem is read-only except /tmp.
+    UPLOAD_DIR = Path("/tmp/uploads")
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/files", StaticFiles(directory=UPLOAD_DIR), name="files")
 
 CORS_HEADERS = {
