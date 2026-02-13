@@ -117,6 +117,22 @@ const getCanvasSafeUrl = (url) => {
   return url;
 };
 
+/** Strip markdown image links from chat content; log URLs to console. */
+const stripImageLinksFromContent = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  const urls = [];
+  let match;
+  while ((match = imageRegex.exec(text)) !== null) {
+    urls.push(match[1]);
+  }
+  if (urls.length) {
+    console.debug('[chat] image URLs (hidden from UI):', urls);
+  }
+  let cleaned = text.replace(imageRegex, '').replace(/^\s*\d+\.\s*$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  return cleaned;
+};
+
 const toAspectRatio = (width, height) => {
   const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
   const divisor = gcd(width, height);
@@ -211,9 +227,18 @@ const pollGenerationTask = async (taskId) => {
   return response.json();
 };
 
+const CAMERA_ATTRACT_KEY = 'prodshoots_camera_attract_done';
+
 function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showCameraAttract, setShowCameraAttract] = useState(() => {
+    try {
+      return !localStorage.getItem(CAMERA_ATTRACT_KEY);
+    } catch {
+      return false;
+    }
+  });
   const [alphaMatting, setAlphaMatting] = useState(true);
   const [foregroundThreshold, setForegroundThreshold] = useState(240);
   const [backgroundThreshold, setBackgroundThreshold] = useState(10);
@@ -290,6 +315,12 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
     }
   };
   const handleUploadTrigger = () => {
+    if (showCameraAttract) {
+      try {
+        localStorage.setItem(CAMERA_ATTRACT_KEY, '1');
+      } catch {}
+      setShowCameraAttract(false);
+    }
     if (!hideGuideNextTime) {
       setShowUploadGuide(true);
     } else {
@@ -304,7 +335,7 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
       </div>
       <div className="icon-sidebar">
         <button
-          className={`icon-tile ${activePanel === 'product' ? 'active' : ''}`}
+          className={`icon-tile ${activePanel === 'product' ? 'active' : ''} ${showCameraAttract ? 'attract-attention' : ''}`}
           onClick={handleUploadTrigger}
           title="Add Product Photo"
         >
@@ -484,7 +515,7 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
   const [loading, setLoading] = useState(false);
   const currentModel = selectedModel || AI_MODELS[0].id;
   const [chat, setChat] = useState([
-    { sender: 'bot', text: 'Hi! I\'m your product photography assistant.\n\n• Ask for prompt suggestions (e.g. "What background ideas can you suggest?")\n• Add a product to the canvas, then ask me to generate (e.g. "Generate with spa marble backdrop")\n• I\'ll show thumbnails you can click to apply to the canvas.' }
+    { sender: 'bot', text: 'Hi! I\'m your product photography assistant. Click the camera icon to upload a product image to the canvas, then try a quick prompt below.' }
   ]);
   const [threadId] = useState(() => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session-${Date.now()}`));
 
@@ -561,19 +592,20 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
         <div className="chat-history">
           {chat.map((msg, idx) => (
             <div key={idx} className={`chat-message ${msg.sender === 'user' ? 'is-user' : 'is-bot'}`}>
-              <div className="chat-bubble">{msg.text}</div>
+              <div className="chat-bubble">
+                {msg.sender === 'bot' ? stripImageLinksFromContent(msg.text) : msg.text}
+              </div>
               {idx === 0 && showQuickPrompts && (
                 <div className="chat-empty inline">
                   <div className="chat-empty-badge">
                     <Icon name="spark" />
                     <span>Try a quick prompt</span>
                   </div>
-                  <button onClick={() => handleSuggestion('What background ideas can you suggest?')} className="empty-chip suggestion">Get suggestions</button>
                   <div className="chat-empty-grid">
-                    <button onClick={() => handleSuggestion('Soft morning light')} className="empty-chip">Soft morning light</button>
-                    <button onClick={() => handleSuggestion('Minimal shadow play')} className="empty-chip">Minimal shadow play</button>
-                    <button onClick={() => handleSuggestion('Spa marble backdrop')} className="empty-chip">Spa marble backdrop</button>
+                    <button onClick={() => handleSuggestion('What background ideas can you suggest?')} className="empty-chip">What background ideas can you suggest?</button>
+                    <button onClick={() => handleSuggestion('Generate with minimal high end backdrop')} className="empty-chip">Generate with minimal high end backdrop</button>
                     <button onClick={() => handleSuggestion('Botanical studio set')} className="empty-chip">Botanical studio set</button>
+                    <button onClick={() => handleSuggestion('Generate with spa marble backdrop')} className="empty-chip">Generate with spa marble backdrop</button>
                   </div>
                 </div>
               )}
