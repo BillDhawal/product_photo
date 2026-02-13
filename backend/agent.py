@@ -5,11 +5,14 @@ Runs inside the backend; tools call /upload, /generate, /status via HTTP.
 import base64
 import contextvars
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 log = logging.getLogger(__name__)
 
 # Request-scoped aspect ratio (from canvas); tools read this
 _aspect_ratio_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("aspect_ratio", default=None)
+# Request-scoped number of images to generate (default 4)
+_num_images_ctx: contextvars.ContextVar[int] = contextvars.ContextVar("num_images", default=4)
 import json
 import os
 import time
@@ -134,12 +137,8 @@ def _upload_file_io(filepath: Path) -> str:
     return url
 
 
-def _generate_product_image_impl(prompt: str, image_url: str, model: str = "nano-banana-pro") -> str:
-    """Internal implementation - returns string or raises."""
-    aspect_ratio = _aspect_ratio_ctx.get() or "4:3"
-    log.info("generate_product_image start prompt=%r model=%s aspect_ratio=%s", prompt[:60], model, aspect_ratio)
-    kie_url = _local_to_public_url(image_url)
-    base = _get_base_url()
+def _generate_one_image(prompt: str, kie_url: str, base: str, model: str, aspect_ratio: str) -> list[str]:
+    """Generate a single image; returns list of URLs (usually 1)."""
     payload = {
         "model": model,
         "prompt": prompt,
@@ -153,7 +152,6 @@ def _generate_product_image_impl(prompt: str, image_url: str, model: str = "nano
     data = r.json()
     task_id = data.get("data", {}).get("taskId") or data.get("data", {}).get("recordId")
     if not task_id:
-        log.error("generate response missing taskId: %s", data)
         raise RuntimeError("Generate response missing taskId")
 
     for attempt in range(40):
@@ -161,22 +159,47 @@ def _generate_product_image_impl(prompt: str, image_url: str, model: str = "nano
         s.raise_for_status()
         sd = s.json().get("data", {})
         state = sd.get("state")
-        log.info("generate poll attempt=%d state=%s", attempt + 1, state)
         if state == "success":
             rj = sd.get("resultJson") or "{}"
             try:
                 urls = json.loads(rj).get("resultUrls", [])
-                log.info("generate success urls=%d", len(urls))
-                return "\n".join(urls) if urls else "No result URLs."
-            except json.JSONDecodeError as e:
-                log.warning("resultJson parse error: %s", e)
-                return "No result URLs."
+                return urls if urls else []
+            except json.JSONDecodeError:
+                return []
         if state == "fail":
-            log.error("generate failed: %s", sd)
             raise RuntimeError(f"Generation failed: {sd}")
         time.sleep(3)
-    log.error("generate timed out after 40 polls")
     raise TimeoutError("Generation timed out")
+
+
+def _generate_product_image_impl(prompt: str, image_url: str, model: str = "nano-banana-pro") -> str:
+    """Generate product photos (default 4); returns newline-separated URLs."""
+    aspect_ratio = _aspect_ratio_ctx.get() or "4:3"
+    num_images = _num_images_ctx.get()
+    log.info("generate_product_image start prompt=%r model=%s aspect_ratio=%s num_images=%d", prompt[:60], model, aspect_ratio, num_images)
+    kie_url = _local_to_public_url(image_url)
+    base = _get_base_url()
+
+    all_urls: list[str] = []
+    num_images = max(1, min(num_images, 4))  # Clamp 1–4
+
+    if num_images == 1:
+        all_urls = _generate_one_image(prompt, kie_url, base, model, aspect_ratio)
+    else:
+        with ThreadPoolExecutor(max_workers=num_images) as executor:
+            futures = [
+                executor.submit(_generate_one_image, prompt, kie_url, base, model, aspect_ratio)
+                for _ in range(num_images)
+            ]
+            for future in as_completed(futures):
+                try:
+                    urls = future.result()
+                    all_urls.extend(urls)
+                except Exception as e:
+                    log.warning("One generation failed: %s", e)
+
+    log.info("generate success total urls=%d", len(all_urls))
+    return "\n".join(all_urls) if all_urls else "No result URLs."
 
 
 @tool
@@ -247,11 +270,12 @@ def _get_agent():
     return _agent
 
 
-def chat_turn(message: str, thread_id: str = "default", image_url: str | None = None, model: str | None = None, aspect_ratio: str | None = None) -> dict:
+def chat_turn(message: str, thread_id: str = "default", image_url: str | None = None, model: str | None = None, aspect_ratio: str | None = None, num_images: int = 4) -> dict:
     """
     Run one agent turn. Returns { "content": str, "thumbnails": list[str] }.
     """
     _aspect_ratio_ctx.set(aspect_ratio)
+    _num_images_ctx.set(num_images if num_images and 1 <= num_images <= 4 else 4)
     agent = _get_agent()
     config = {"configurable": {"thread_id": thread_id}}
     system_sent = False

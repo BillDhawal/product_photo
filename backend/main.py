@@ -257,11 +257,16 @@ async def chat(payload: dict) -> JSONResponse:
     image_url = payload.get("image_url")
     model = payload.get("model")
     aspect_ratio = payload.get("aspect_ratio")
-    log.info("chat request thread_id=%s has_image=%s model=%s aspect_ratio=%s msg_len=%d", thread_id, bool(image_url), model, aspect_ratio, len(message))
+    num_images = payload.get("num_images", 4)
+    if isinstance(num_images, (int, float)):
+        num_images = int(num_images)
+    else:
+        num_images = 4
+    log.info("chat request thread_id=%s has_image=%s model=%s aspect_ratio=%s num_images=%d msg_len=%d", thread_id, bool(image_url), model, aspect_ratio, num_images, len(message))
 
     try:
         from agent import chat_turn
-        out = chat_turn(message=message, thread_id=thread_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio)
+        out = chat_turn(message=message, thread_id=thread_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio, num_images=num_images)
         thumb_count = len(out.get("thumbnails", []))
         log.info("chat response thumbnails=%d", thumb_count)
         return JSONResponse({"content": out["content"], "thumbnails": out.get("thumbnails", [])})
@@ -272,7 +277,7 @@ async def chat(payload: dict) -> JSONResponse:
         if "tool_call" in err_str.lower() and "tool_call_id" in err_str:
             try:
                 fresh_id = f"{thread_id}-{uuid.uuid4().hex[:8]}"
-                out = chat_turn(message=message, thread_id=fresh_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio)
+                out = chat_turn(message=message, thread_id=fresh_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio, num_images=num_images)
                 return JSONResponse({"content": out["content"], "thumbnails": out.get("thumbnails", [])})
             except Exception:
                 pass

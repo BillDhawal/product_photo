@@ -509,7 +509,8 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
         thread_id: threadId,
         ...(imageUrl ? { image_url: imageUrl } : {}),
         ...(currentModel ? { model: currentModel } : {}),
-        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {})
+        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
+        num_images: 4
       };
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
@@ -544,10 +545,7 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
   const showQuickPrompts = chat.length === 1 && chat[0].sender === 'bot';
   return (
     <section className="ai-chatbot">
-      <div className="chat-header-row">
-        <h3>AI Chat</h3>
-      </div>
-      <div className="model-row compact">
+      <div className="model-row compact inline">
         <label>Model</label>
         <Select
           value={currentModel}
