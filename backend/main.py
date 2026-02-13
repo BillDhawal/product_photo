@@ -1,9 +1,14 @@
+import logging
 import os
 import uuid
 from pathlib import Path
 from typing import Optional
 
 import requests
+
+# Logs go to stderr → CloudWatch
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger(__name__)
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
@@ -86,6 +91,27 @@ def upload_to_s3(file_path: Path, content_type: str) -> str:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/health/details")
+def health_details() -> dict:
+    kie_configured = bool(KIE_API_KEY)
+    vecteezy_configured = bool(VECTEEZY_API_KEY and VECTEEZY_ACCOUNT_ID)
+    openai_configured = bool(os.getenv("OPENAI_API_KEY"))
+    upload_dir_writable = UPLOAD_DIR.exists() and os.access(UPLOAD_DIR, os.W_OK)
+    return {
+        "status": "ok",
+        "dependencies": {
+            "kie_api_key_configured": kie_configured,
+            "vecteezy_configured": vecteezy_configured,
+            "openai_configured": openai_configured,
+            "public_file_base_configured": bool(PUBLIC_FILE_BASE),
+            "use_s3": USE_S3,
+            "s3_bucket_configured": bool(os.getenv("S3_BUCKET")),
+            "upload_dir": str(UPLOAD_DIR),
+            "upload_dir_writable": upload_dir_writable,
+        },
+    }
 
 
 @app.post("/upload")
@@ -213,6 +239,44 @@ def proxy_options() -> Response:
     return Response(
         headers=CORS_HEADERS
     )
+
+
+def _require_openai() -> None:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured")
+
+
+@app.post("/chat")
+async def chat(payload: dict) -> JSONResponse:
+    """Chat with the product photography agent. Payload: { message, thread_id?, image_url?, model? }."""
+    _require_openai()
+    message = payload.get("message")
+    if not message or not isinstance(message, str):
+        raise HTTPException(status_code=400, detail="message is required and must be a string")
+    thread_id = payload.get("thread_id") or "default"
+    image_url = payload.get("image_url")
+    model = payload.get("model")
+    aspect_ratio = payload.get("aspect_ratio")
+    log.info("chat request thread_id=%s has_image=%s model=%s aspect_ratio=%s msg_len=%d", thread_id, bool(image_url), model, aspect_ratio, len(message))
+
+    try:
+        from agent import chat_turn
+        out = chat_turn(message=message, thread_id=thread_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio)
+        thumb_count = len(out.get("thumbnails", []))
+        log.info("chat response thumbnails=%d", thumb_count)
+        return JSONResponse({"content": out["content"], "thumbnails": out.get("thumbnails", [])})
+    except Exception as exc:
+        err_str = str(exc)
+        log.exception("chat failed: %s", err_str)
+        # Retry with fresh thread if corrupted checkpoint (tool_calls without response)
+        if "tool_call" in err_str.lower() and "tool_call_id" in err_str:
+            try:
+                fresh_id = f"{thread_id}-{uuid.uuid4().hex[:8]}"
+                out = chat_turn(message=message, thread_id=fresh_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio)
+                return JSONResponse({"content": out["content"], "thumbnails": out.get("thumbnails", [])})
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=err_str) from exc
 
 
 @app.get("/vecteezy/resources")

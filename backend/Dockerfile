@@ -1,20 +1,12 @@
-FROM python:3.12-slim
+# AWS Lambda Python base image - use arm64 to match Lambda function architecture
+FROM public.ecr.aws/lambda/python:3.12-arm64
 
-WORKDIR /app
+# Copy requirements and install
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy application code
+COPY main.py agent.py lambda_handler.py ${LAMBDA_TASK_ROOT}/
 
-COPY main.py .
-
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
-ENV AWS_LWA_PORT=8000
-ENV AWS_LWA_READINESS_CHECK_PATH=/health
-ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/extensions/lambda-adapter
-
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
-
-EXPOSE 8000
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Lambda handler (Mangum wraps FastAPI for API Gateway)
+CMD ["lambda_handler.handler"]

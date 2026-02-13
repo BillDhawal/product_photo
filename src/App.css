@@ -627,6 +627,12 @@ body {
   stroke-width: 1.6;
 }
 
+.empty-chip.suggestion {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: var(--accent);
+  align-self: flex-start;
+}
+
 .chat-empty-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -664,6 +670,10 @@ body {
 
 .chat-message.is-bot {
   align-items: flex-start;
+}
+
+.chat-message.is-bot .chat-bubble {
+  white-space: pre-wrap;
 }
 
 .chat-bubble {

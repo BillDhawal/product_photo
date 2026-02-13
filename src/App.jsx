@@ -84,6 +84,13 @@ const DEFAULT_PROMPT_PREFIX =
   'Preserve all readable product text and logos exactly as in the reference (no misspellings or gibberish). ' +
   'Refine lighting, background texture, and overall realism without removing key elements.';
 
+const AI_MODELS = [
+  { id: 'flux-2/pro-image-to-image', name: 'Flux 2' },
+  { id: 'gpt-image/1.5-image-to-image', name: 'GPT Image 1.5' },
+  { id: 'ideogram/v3-reframe', name: 'Ideogram v3 Reframe' },
+  { id: 'nano-banana-pro', name: 'Nano Banana Pro' }
+];
+
 const dataUrlToBlob = (dataUrl) => {
   const [header, base64] = dataUrl.split(',');
   const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
@@ -472,111 +479,63 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
   );
 }
 
-function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
-  // Chatbot state
-  const models = [
-    { id: 'flux-2/pro-image-to-image', name: 'Flux 2 (Image-to-Image)' },
-    { id: 'gpt-image/1.5-image-to-image', name: 'GPT Image 1.5 (Image-to-Image)' },
-    { id: 'ideogram/v3-reframe', name: 'Ideogram v3 Reframe' },
-    { id: 'nano-banana-pro', name: 'Nano Banana Pro' }
-  ];
-  const [selectedModel, setSelectedModel] = useState(models[0].id);
+function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selectedModel, onModelChange }) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const currentModel = selectedModel || AI_MODELS[0].id;
   const [chat, setChat] = useState([
-    { sender: 'bot', text: 'Hi! I am your AI assistant. What background can I create for your product photo?' }
+    { sender: 'bot', text: 'Hi! I\'m your product photography assistant.\n\n• Ask for prompt suggestions (e.g. "What background ideas can you suggest?")\n• Add a product to the canvas, then ask me to generate (e.g. "Generate with spa marble backdrop")\n• I\'ll show thumbnails you can click to apply to the canvas.' }
   ]);
-  // Handle prompt suggestion click
+  const [threadId] = useState(() => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session-${Date.now()}`));
+
   const handleSuggestion = (p) => {
     setPrompt('');
     sendMessage(p);
   };
-  // Send message (user prompt or input)
+
   const sendMessage = async (p) => {
     if (!p) return;
     setChat(prev => [...prev, { sender: 'user', text: p }]);
     setLoading(true);
     setPrompt('');
     try {
-      // TODO: Consider langchain/langgraph for prompt orchestration.
-      const finalPrompt = `${DEFAULT_PROMPT_PREFIX} ${p}`;
+      let imageUrl = null;
       const referenceImage = getCanvasSnapshot ? getCanvasSnapshot() : null;
-      if (!referenceImage) {
-        throw new Error('Capture a canvas image before generating.');
+      if (referenceImage) {
+        imageUrl = await uploadReferenceImage(referenceImage);
       }
-      const inputUrl = await uploadReferenceImage(referenceImage);
-      const quality =
-        selectedModel === 'gpt-image/1.5-image-to-image' ? 'medium' : undefined;
-      const imageSize =
-        selectedModel === 'ideogram/v3-reframe'
-          ? toIdeogramSize(aspectRatio, '1K')
-          : undefined;
-      const outputFormat =
-        selectedModel === 'nano-banana-pro' ? 'png' : undefined;
-      const imageInput =
-        selectedModel === 'nano-banana-pro' && inputUrl ? [inputUrl] : undefined;
-      const task = await createGenerationTask({
-        prompt: finalPrompt,
-        inputUrl,
-        aspectRatio,
-        model: selectedModel,
-        quality,
-        imageSize,
-        renderingSpeed: selectedModel === 'ideogram/v3-reframe' ? 'BALANCED' : undefined,
-        style: selectedModel === 'ideogram/v3-reframe' ? 'AUTO' : undefined,
-        numImages: selectedModel === 'ideogram/v3-reframe' ? '2' : undefined,
-        imageInput,
-        outputFormat
+      const payload = {
+        message: p,
+        thread_id: threadId,
+        ...(imageUrl ? { image_url: imageUrl } : {}),
+        ...(currentModel ? { model: currentModel } : {}),
+        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {})
+      };
+      const response = await fetch(`${API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      if (task?.code && task.code !== 200) {
-        throw new Error(task?.msg || 'Generation failed.');
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || 'Chat request failed.');
       }
-      const taskId = task?.data?.taskId || task?.data?.recordId;
-      if (!taskId) {
-        throw new Error(task?.msg || 'KIE task ID missing.');
-      }
-      let status;
-      for (let i = 0; i < 20; i += 1) {
-        status = await pollGenerationTask(taskId);
-        const state = status?.data?.state;
-        if (state === 'success' || state === 'fail') break;
-        await new Promise(resolve => setTimeout(resolve, 2500));
-      }
-      if (status?.data?.state !== 'success') {
-        throw new Error(status?.data?.failMsg || 'Generation failed.');
-      }
-      let resultUrls = [];
-      try {
-        const resultJson = status?.data?.resultJson || '{}';
-        const parsed = JSON.parse(resultJson);
-        resultUrls = parsed.resultUrls || [];
-      } catch (err) {
-        resultUrls = [];
-      }
-      let finalUrls = resultUrls.slice(0, 2);
-      if (finalUrls.length === 1) {
-        finalUrls = [finalUrls[0], finalUrls[0]];
-      }
-      const thumbnails = finalUrls.map((url, idx) => ({ id: `${idx}`, url }));
+      const data = await response.json();
+      const content = data?.content ?? 'No response.';
+      const thumbnails = data?.thumbnails ?? [];
       setChat(prev => [
         ...prev,
         {
           sender: 'bot',
-          text: `Here are some generated backgrounds for: "${p}"`,
-          thumbnails: thumbnails.map(t => t.url)
+          text: content,
+          thumbnails
         }
       ]);
     } catch (err) {
-      const message = err?.message || 'Generation failed. Please try again.';
-      const hint = message.toLowerCase().includes('invalid image format')
-        ? 'Tip: ensure your upload URL is public (set VITE_PUBLIC_FILE_BASE to your tunnel URL).'
-        : '';
+      const message = err?.message || 'Something went wrong. Please try again.';
       setChat(prev => [
         ...prev,
-        {
-          sender: 'bot',
-          text: hint ? `${message} ${hint}` : message
-        }
+        { sender: 'bot', text: message }
       ]);
     } finally {
       setLoading(false);
@@ -591,11 +550,11 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
       <div className="model-row compact">
         <label>Model</label>
         <Select
-          value={selectedModel}
-          onChange={e => setSelectedModel(e.target.value)}
+          value={currentModel}
+          onChange={e => onModelChange?.(e.target.value)}
           className="flowbite-select compact"
         >
-          {models.map(m => (
+          {AI_MODELS.map(m => (
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
         </Select>
@@ -611,6 +570,7 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
                     <Icon name="spark" />
                     <span>Try a quick prompt</span>
                   </div>
+                  <button onClick={() => handleSuggestion('What background ideas can you suggest?')} className="empty-chip suggestion">Get suggestions</button>
                   <div className="chat-empty-grid">
                     <button onClick={() => handleSuggestion('Soft morning light')} className="empty-chip">Soft morning light</button>
                     <button onClick={() => handleSuggestion('Minimal shadow play')} className="empty-chip">Minimal shadow play</button>
@@ -619,15 +579,16 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
                   </div>
                 </div>
               )}
-              {msg.thumbnails && (
+              {msg.thumbnails && msg.thumbnails.length > 0 && (
                 <div className="thumbnail-grid">
                   {msg.thumbnails.map((url, tidx) => (
                     <button
                       key={tidx}
                       className="thumbnail-card"
                       onClick={() => onSelectGenerated?.(url)}
+                      type="button"
                     >
-                      <img src={url} alt={`Thumbnail ${tidx + 1}`} />
+                      <img src={getCanvasSafeUrl(url)} alt={`Generated ${tidx + 1}`} />
                     </button>
                   ))}
                 </div>
@@ -637,7 +598,7 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio }) {
           {loading && (
             <div className="chat-loading">
               <div className="spinner" />
-              <span>Generating thumbnails...</span>
+              <span>Thinking...</span>
             </div>
           )}
         </div>
@@ -1079,6 +1040,7 @@ function PropsPanel({
 function App() {
   const [frames, setFrames] = useState([]);
   const [activePanel, setActivePanel] = useState('chat');
+  const [selectedModel, setSelectedModel] = useState('nano-banana-pro');
   const stageRef = useRef(null);
   const [frameReplaceRequest, setFrameReplaceRequest] = useState(null);
   const [remoteProps, setRemoteProps] = useState([]);
@@ -1481,6 +1443,8 @@ function App() {
                 getCanvasSnapshot={() => stageRef.current?.toDataURL({ pixelRatio: 1 }) || null}
                 onSelectGenerated={(url) => replaceWithBackground(url)}
                 aspectRatio={aspectRatio}
+                selectedModel={selectedModel}
+                onModelChange={setSelectedModel}
               />
             )}
             {activePanel === 'props' && (
