@@ -59,7 +59,25 @@ body {
 
 .topbar-actions {
   display: flex;
+  align-items: center;
   gap: 0.6rem;
+}
+
+.credits-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.credits-badge svg {
+  color: #fbbf24;
 }
 
 .icon-button {

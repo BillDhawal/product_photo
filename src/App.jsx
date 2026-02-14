@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { removeBackground } from '@imgly/background-removal';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
 import { Button, Select, TextInput } from 'flowbite-react';
-import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
 import ChatBubbleOutlineRounded from '@mui/icons-material/ChatBubbleOutlineRounded';
 import ImageRounded from '@mui/icons-material/ImageRounded';
 import LayersRounded from '@mui/icons-material/LayersRounded';
@@ -14,6 +14,7 @@ import ExpandMoreRounded from '@mui/icons-material/ExpandMoreRounded';
 import CropFreeRounded from '@mui/icons-material/CropFreeRounded';
 import CameraAltRounded from '@mui/icons-material/CameraAltRounded';
 import StorefrontRounded from '@mui/icons-material/StorefrontRounded';
+import MonetizationOnRounded from '@mui/icons-material/MonetizationOnRounded';
 import './App.css';
 import propPodium from './assets/props/podioum_1.png';
 import propSnakePlant from './assets/props/snake_plant_1.png';
@@ -71,6 +72,52 @@ const Icon = ({ name }) => {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+function CreditsBadge() {
+  const { user } = useUser();
+  const [credits, setCredits] = useState(null);
+  const [unlimited, setUnlimited] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCredits = React.useCallback(async () => {
+    if (!user?.id && !user?.primaryEmailAddress?.emailAddress) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const params = new URLSearchParams();
+      if (user?.id) params.set('user_id', user.id);
+      if (user?.primaryEmailAddress?.emailAddress) params.set('user_email', user.primaryEmailAddress.emailAddress);
+      const res = await fetch(`${API_BASE_URL}/credits?${params}`);
+      const data = await res.json();
+      setCredits(data?.credits ?? 0);
+      setUnlimited(data?.unlimited ?? false);
+    } catch {
+      setCredits(0);
+      setUnlimited(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, user?.primaryEmailAddress?.emailAddress]);
+
+  useEffect(() => {
+    fetchCredits();
+  }, [fetchCredits]);
+
+  useEffect(() => {
+    const onRefresh = () => fetchCredits();
+    window.addEventListener('credits-refresh', onRefresh);
+    return () => window.removeEventListener('credits-refresh', onRefresh);
+  }, [fetchCredits]);
+
+  if (loading || credits === null) return null;
+  return (
+    <div className="credits-badge" title={unlimited ? 'Unlimited credits' : `${credits} credits available`}>
+      <MonetizationOnRounded sx={{ fontSize: 20 }} />
+      <span>{unlimited ? '∞' : credits}</span>
+    </div>
+  );
+}
 const PUBLIC_FILE_BASE = import.meta.env.VITE_PUBLIC_FILE_BASE || API_BASE_URL;
 const ENABLE_PROXY =
   import.meta.env.VITE_ENABLE_PROXY
@@ -511,6 +558,7 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
 }
 
 function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selectedModel, onModelChange }) {
+  const { user } = useUser();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const currentModel = selectedModel || AI_MODELS[0].id;
@@ -541,7 +589,9 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
         ...(imageUrl ? { image_url: imageUrl } : {}),
         ...(currentModel ? { model: currentModel } : {}),
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-        num_images: 4
+        num_images: 4,
+        ...(user?.id ? { user_id: user.id } : {}),
+        ...(user?.primaryEmailAddress?.emailAddress ? { user_email: user.primaryEmailAddress.emailAddress } : {})
       };
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
@@ -563,6 +613,7 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
           thumbnails
         }
       ]);
+      window.dispatchEvent(new Event('credits-refresh'));
     } catch (err) {
       const message = err?.message || 'Something went wrong. Please try again.';
       setChat(prev => [
@@ -1453,6 +1504,7 @@ function App() {
             </SignUpButton>
           </SignedOut>
           <SignedIn>
+            <CreditsBadge />
             <UserButton />
           </SignedIn>
           <button className="icon-button primary" title="Download" onClick={handleDownload}>

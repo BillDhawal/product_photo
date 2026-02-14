@@ -6,7 +6,7 @@ COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
 # Copy application code
-COPY main.py agent.py lambda_handler.py ${LAMBDA_TASK_ROOT}/
+COPY main.py agent.py credits.py lambda_handler.py ${LAMBDA_TASK_ROOT}/
 
 # Lambda handler (Mangum wraps FastAPI for API Gateway)
 CMD ["lambda_handler.handler"]

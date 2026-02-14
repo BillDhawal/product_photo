@@ -93,6 +93,22 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/credits")
+def get_credits(user_id: Optional[str] = None, user_email: Optional[str] = None) -> JSONResponse:
+    """Get available credits for user. Requires user_id or user_email."""
+    if not user_id and not user_email:
+        return JSONResponse({"credits": 0, "error": "user_id or user_email required"}, status_code=400)
+    try:
+        from credits import get_credits_available, has_unlimited_credits
+        if has_unlimited_credits(user_id, user_email):
+            return JSONResponse({"credits": 999999, "unlimited": True})
+        credits = get_credits_available(user_id or "", user_email)
+        return JSONResponse({"credits": credits, "unlimited": False})
+    except Exception as e:
+        log.exception("get_credits failed: %s", e)
+        return JSONResponse({"credits": 8, "error": str(e)})  # Return 8 on error so UI works
+
+
 @app.get("/health/details")
 def health_details() -> dict:
     kie_configured = bool(KIE_API_KEY)
@@ -258,6 +274,8 @@ async def chat(payload: dict) -> JSONResponse:
     model = payload.get("model")
     aspect_ratio = payload.get("aspect_ratio")
     num_images = payload.get("num_images", 4)
+    user_id = payload.get("user_id")
+    user_email = payload.get("user_email")
     if isinstance(num_images, (int, float)):
         num_images = int(num_images)
     else:
@@ -266,7 +284,7 @@ async def chat(payload: dict) -> JSONResponse:
 
     try:
         from agent import chat_turn
-        out = chat_turn(message=message, thread_id=thread_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio, num_images=num_images)
+        out = chat_turn(message=message, thread_id=thread_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio, num_images=num_images, user_id=user_id, user_email=user_email)
         thumb_count = len(out.get("thumbnails", []))
         log.info("chat response thumbnails=%d", thumb_count)
         return JSONResponse({"content": out["content"], "thumbnails": out.get("thumbnails", [])})
@@ -277,7 +295,7 @@ async def chat(payload: dict) -> JSONResponse:
         if "tool_call" in err_str.lower() and "tool_call_id" in err_str:
             try:
                 fresh_id = f"{thread_id}-{uuid.uuid4().hex[:8]}"
-                out = chat_turn(message=message, thread_id=fresh_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio, num_images=num_images)
+                out = chat_turn(message=message, thread_id=fresh_id, image_url=image_url, model=model, aspect_ratio=aspect_ratio, num_images=num_images, user_id=user_id, user_email=user_email)
                 return JSONResponse({"content": out["content"], "thumbnails": out.get("thumbnails", [])})
             except Exception:
                 pass

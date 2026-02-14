@@ -13,6 +13,9 @@ log = logging.getLogger(__name__)
 _aspect_ratio_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("aspect_ratio", default=None)
 # Request-scoped number of images to generate (default 4)
 _num_images_ctx: contextvars.ContextVar[int] = contextvars.ContextVar("num_images", default=4)
+# Request-scoped user for credits (user_id, email)
+_user_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("user_id", default=None)
+_user_email_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("user_email", default=None)
 import json
 import os
 import time
@@ -205,7 +208,19 @@ def _generate_product_image_impl(prompt: str, image_url: str, model: str = "nano
 @tool
 def generate_product_image(prompt: str, image_url: str, model: str = "nano-banana-pro") -> str:
     """Generate product photography from prompt and image URL. Uses nano-banana-pro by default."""
+    user_id = _user_id_ctx.get()
+    user_email = _user_email_ctx.get()
     try:
+        from credits import get_credits_available, deduct_credits, has_unlimited_credits, GENERATION_COST
+        if user_id or user_email:
+            if not has_unlimited_credits(user_id, user_email):
+                available = get_credits_available(user_id or "", user_email)
+                if available < GENERATION_COST:
+                    return f"Error: Insufficient credits. You have {available} credits, but generation costs {GENERATION_COST}. You get 8 free credits per day."
+                if not deduct_credits(user_id or "", user_email, GENERATION_COST):
+                    return "Error: Failed to deduct credits. Please try again."
+        return _generate_product_image_impl(prompt, image_url, model)
+    except ImportError:
         return _generate_product_image_impl(prompt, image_url, model)
     except Exception as e:
         log.exception("generate_product_image failed: %s", e)
@@ -270,12 +285,14 @@ def _get_agent():
     return _agent
 
 
-def chat_turn(message: str, thread_id: str = "default", image_url: str | None = None, model: str | None = None, aspect_ratio: str | None = None, num_images: int = 4) -> dict:
+def chat_turn(message: str, thread_id: str = "default", image_url: str | None = None, model: str | None = None, aspect_ratio: str | None = None, num_images: int = 4, user_id: str | None = None, user_email: str | None = None) -> dict:
     """
     Run one agent turn. Returns { "content": str, "thumbnails": list[str] }.
     """
     _aspect_ratio_ctx.set(aspect_ratio)
     _num_images_ctx.set(num_images if num_images and 1 <= num_images <= 4 else 4)
+    _user_id_ctx.set(user_id)
+    _user_email_ctx.set(user_email)
     agent = _get_agent()
     config = {"configurable": {"thread_id": thread_id}}
     system_sent = False
