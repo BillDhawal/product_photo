@@ -15,6 +15,8 @@ import CropFreeRounded from '@mui/icons-material/CropFreeRounded';
 import CameraAltRounded from '@mui/icons-material/CameraAltRounded';
 import StorefrontRounded from '@mui/icons-material/StorefrontRounded';
 import MonetizationOnRounded from '@mui/icons-material/MonetizationOnRounded';
+import { CreditsProvider, useCredits } from './contexts/CreditsContext';
+import { UpgradeModal } from './components/UpgradeModal';
 import './App.css';
 import propPodium from './assets/props/podioum_1.png';
 import propSnakePlant from './assets/props/snake_plant_1.png';
@@ -74,48 +76,19 @@ const Icon = ({ name }) => {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 function CreditsBadge() {
-  const { user } = useUser();
-  const [credits, setCredits] = useState(null);
-  const [unlimited, setUnlimited] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const fetchCredits = React.useCallback(async () => {
-    if (!user?.id && !user?.primaryEmailAddress?.emailAddress) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const params = new URLSearchParams();
-      if (user?.id) params.set('user_id', user.id);
-      if (user?.primaryEmailAddress?.emailAddress) params.set('user_email', user.primaryEmailAddress.emailAddress);
-      const res = await fetch(`${API_BASE_URL}/credits?${params}`);
-      const data = await res.json();
-      setCredits(data?.credits ?? 0);
-      setUnlimited(data?.unlimited ?? false);
-    } catch {
-      setCredits(0);
-      setUnlimited(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, user?.primaryEmailAddress?.emailAddress]);
-
-  useEffect(() => {
-    fetchCredits();
-  }, [fetchCredits]);
-
-  useEffect(() => {
-    const onRefresh = () => fetchCredits();
-    window.addEventListener('credits-refresh', onRefresh);
-    return () => window.removeEventListener('credits-refresh', onRefresh);
-  }, [fetchCredits]);
+  const { credits, unlimited, loading, creditsLow, setShowUpgradeModal } = useCredits();
 
   if (loading || credits === null) return null;
   return (
-    <div className="credits-badge" title={unlimited ? 'Unlimited credits' : `${credits} credits available`}>
+    <button
+      type="button"
+      className={`credits-badge ${creditsLow ? 'clickable' : ''}`}
+      title={unlimited ? 'Unlimited credits' : creditsLow ? 'Get more credits' : `${credits} credits available`}
+      onClick={creditsLow ? () => setShowUpgradeModal(true) : undefined}
+    >
       <MonetizationOnRounded sx={{ fontSize: 20 }} />
       <span>{unlimited ? '∞' : credits}</span>
-    </div>
+    </button>
   );
 }
 const PUBLIC_FILE_BASE = import.meta.env.VITE_PUBLIC_FILE_BASE || API_BASE_URL;
@@ -559,6 +532,7 @@ function Sidebar({ activePanel, setActivePanel, addPhotoFrame }) {
 
 function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selectedModel, onModelChange }) {
   const { user } = useUser();
+  const { canGenerate, setShowUpgradeModal } = useCredits();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const currentModel = selectedModel || AI_MODELS[0].id;
@@ -574,6 +548,10 @@ function AIChatbot({ getCanvasSnapshot, onSelectGenerated, aspectRatio, selected
 
   const sendMessage = async (p) => {
     if (!p) return;
+    if (!canGenerate) {
+      setShowUpgradeModal(true);
+      return;
+    }
     setChat(prev => [...prev, { sender: 'user', text: p }]);
     setLoading(true);
     setPrompt('');
@@ -1487,7 +1465,8 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <CreditsProvider>
+      <div className="app-shell">
       <header className="topbar">
         <div className="brand">
           <div className="brand-icon">
@@ -1513,6 +1492,7 @@ function App() {
         </div>
       </header>
       <SignedIn>
+        <UpgradeModal />
         <div className="app-grid">
           <Sidebar
             activePanel={activePanel}
@@ -1609,6 +1589,7 @@ function App() {
         ?
       </button>
     </div>
+    </CreditsProvider>
   );
 }
 

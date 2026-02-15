@@ -74,10 +74,27 @@ body {
   color: #e5e7eb;
   font-size: 0.9rem;
   font-weight: 600;
+  cursor: default;
+  font-family: inherit;
+}
+
+.credits-badge:focus {
+  outline: none;
 }
 
 .credits-badge svg {
   color: #fbbf24;
+}
+
+.credits-badge.clickable {
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.credits-badge.clickable:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  transform: scale(1.02);
 }
 
 .icon-button {
@@ -1257,4 +1274,220 @@ body {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Upgrade modal / paywall */
+.upgrade-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.upgrade-modal {
+  background: #161b22;
+  border: 1px solid #2a3140;
+  border-radius: 16px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.upgrade-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #2a3140;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.upgrade-modal-close:hover {
+  background: #2a3140;
+  color: #e5e7eb;
+}
+
+.upgrade-modal-header {
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+}
+
+.upgrade-modal-icon {
+  color: #fbbf24;
+  margin-bottom: 1rem;
+}
+
+.upgrade-modal-header h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.upgrade-modal-header p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #9ca3af;
+}
+
+.upgrade-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 0 2rem 2rem;
+}
+
+@media (max-width: 640px) {
+  .upgrade-plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+.upgrade-plan-card {
+  background: #0f131b;
+  border: 1px solid #2a3140;
+  border-radius: 12px;
+  padding: 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.upgrade-plan-card:hover {
+  border-color: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.upgrade-plan-card.popular {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.upgrade-plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.upgrade-plan-header {
+  margin-bottom: 1rem;
+}
+
+.upgrade-plan-header h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.upgrade-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.upgrade-plan-price .amount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.upgrade-plan-price .one-time {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.upgrade-plan-features {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  flex: 1;
+}
+
+.upgrade-plan-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
+
+.upgrade-plan-features li svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.upgrade-plan-cta {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  border: none;
+}
+
+.upgrade-plan-cta.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+}
+
+.upgrade-plan-cta.primary:hover {
+  background: linear-gradient(135deg, var(--accent-light), var(--accent));
+  transform: translateY(-1px);
+}
+
+.upgrade-plan-cta.secondary {
+  background: #2a3140;
+  color: #e5e7eb;
+  border: 1px solid #3b4252;
+}
+
+.upgrade-plan-cta.secondary:hover {
+  background: #3b4252;
+  transform: translateY(-1px);
 }
